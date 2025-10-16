@@ -25,6 +25,7 @@ Inside each daily folder, you’ll find:
 - **2_quiz.md** → 5-question quiz with answers.
 - **3_resources.md** → links to CodingNomads course lessons, the labs repo, and official docs.
 - **4_assignments.md** → 3–5 coding challenges to reinforce the concepts.
+- **Demo** → the demo project used during the lecture. (to run, open them as a separate project) 
 
 
 ### 2. Running the Project
