@@ -1,34 +1,50 @@
 # Week 1 — Spring Core: IoC & Dependency Injection + Project Bootstrap
 
-Welcome! Today we kick off our 9-week Advanced Java + Spring Boot bootcamp and lay the foundation for everything that follows. We’ll cover the core ideas behind the Spring Framework, **Inversion of Control (IoC)** and **Dependency Injection (DI)**, and initialize the single project we’ll build on week-by-week: **Recipe API**.
+Welcome! Today we kick off our 9-week Advanced Java + Spring Boot bootcamp and lay the foundation for everything that
+follows. We’ll cover the core ideas behind the Spring Framework, **Inversion of Control (IoC)** and **Dependency
+Injection (DI)**, and initialize the single project we’ll build on week-by-week: **Recipe API**.
 
 > **Outcome by the end of Week 1**
 > - You understand IoC, DI, beans, the ApplicationContext, and component scanning.
-> - You can create and wire Spring beans using annotations (@Component, @Configuration, @Bean, @Autowired/@Qualifier/@Primary).
+> - You can create and wire Spring beans using annotations (@Component, @Configuration, @Bean,
+    @Autowired/@Qualifier/@Primary).
 > - You can bootstrap a Spring Boot project with Gradle and Java 17.
 > - You run the app and see your beans working (via a `CommandLineRunner`).
 
 ---
 
-## 1) Core Concepts 
+## 1) Core Concepts
 
 ### Inversion of Control (IoC)
-Traditionally, classes create the objects they need. With **IoC**, that control is *inverted*: an external container (Spring) creates and provides dependencies to your classes. This decouples your code and makes it easier to test and maintain.
+
+Traditionally, classes create the objects they need. With **IoC**, that control is *inverted*: an external container (
+Spring) creates and provides dependencies to your classes. This decouples your code and makes it easier to test and
+maintain.
 
 ### Dependency Injection (DI)
-**DI** is *how* IoC is realized. Instead of instantiating dependencies inline (`new Something()`), you **declare** them and Spring injects the appropriate implementations at runtime. In Spring, DI commonly happens through:
+
+**DI** is *how* IoC is realized. Instead of instantiating dependencies inline (`new Something()`), you **declare** them
+and Spring injects the appropriate implementations at runtime. In Spring, DI commonly happens through:
+
 - **Constructor injection** (preferred in modern Spring)
 - **Setter injection**
 - **Field injection** (generally discouraged in new code)
 
 ### Beans & the IoC Container
-A **bean** is any object managed by Spring’s IoC container. Beans are discovered via **component scanning** (classes annotated with stereotypes like `@Component`, `@Service`, `@Repository`, `@Controller`) or registered explicitly via `@Configuration` + `@Bean` methods.
+
+A **bean** is any object managed by Spring’s IoC container. Beans are discovered via **component scanning** (classes
+annotated with stereotypes like `@Component`, `@Service`, `@Repository`, `@Controller`) or registered explicitly via
+`@Configuration` + `@Bean` methods.
 
 ### Component Scanning Basics
-`@SpringBootApplication` triggers component scanning from its package downward. Keep your main application class in a top‑level package (e.g., `com.codingnomads.bootcamp.recipeapi`) and put subpackages under it.
+
+`@SpringBootApplication` triggers component scanning from its package downward. Keep your main application class in a
+top‑level package (e.g., `com.codingnomads.bootcamp.recipeapi`) and put subpackages under it.
 
 ### Bean Disambiguation
+
 If multiple beans satisfy a dependency:
+
 - Mark one as `@Primary` **or**
 - Use `@Qualifier("beanName")` to select the exact bean
 
@@ -91,29 +107,34 @@ tasks.named('test') {
 Spring Boot supports both **Maven** and **Gradle** build tools.
 
 #### Maven (XML-based)
+
 - Configuration file: `pom.xml`
 - Verbose but mature and widely used.
 
 Example:
+
 ```xml
+
 <project>
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>com.codingnomads</groupId>
-  <artifactId>recipe-api</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <parent>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-parent</artifactId>
-      <version>3.3.4</version>
-  </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codingnomads</groupId>
+    <artifactId>recipe-api</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.4</version>
+    </parent>
 </project>
 ```
 
 #### Gradle (Groovy-based)
+
 - Configuration file: `build.gradle`
 - More concise, faster, and scriptable.
 
 Run:
+
 ```bash
 ./gradlew build
 ./gradlew bootRun
@@ -128,6 +149,7 @@ Run:
 ### 3.1 Main application
 
 `RecipeApiApplication.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi;
 
@@ -148,6 +170,7 @@ public class RecipeApiApplication {
 ### 3.2 Domain model and abstractions
 
 `RecipePreview.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
 
@@ -170,6 +193,7 @@ public class RecipePreview {
 ```
 
 `RecipeSuggester.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
 
@@ -181,6 +205,7 @@ public interface RecipeSuggester {
 ### 3.3 Two implementations
 
 `VegetarianRecipeSuggester.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
 
@@ -205,6 +230,7 @@ public class VegetarianRecipeSuggester implements RecipeSuggester {
 ```
 
 `QuickMealRecipeSuggester.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
 
@@ -226,6 +252,7 @@ public class QuickMealRecipeSuggester implements RecipeSuggester {
 ### 3.4 Consumer bean
 
 `RecipePrinter.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
 
@@ -254,6 +281,7 @@ public class RecipePrinter {
 ### 3.5 Config & Runner
 
 `AppConfig.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.config;
 
@@ -275,11 +303,13 @@ public class AppConfig {
 ```
 
 `application.properties`
+
 ```properties
 app.name=RecipeAPI (Week 1)
 ```
 
 `RecipeStartupRunner.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
 
@@ -317,6 +347,7 @@ public class RecipeStartupRunner implements CommandLineRunner {
 ```
 
 **Output:**
+
 ```
 [RecipeAPI (Week 1)] Try this: Roasted Veggie Bowl — Sheet-pan roasted vegetables over quinoa with a lemon-tahini drizzle.
 Override: 10-Minute Garlic Noodles — Fast skillet noodles tossed with garlic, butter, soy, and scallions.
@@ -325,6 +356,7 @@ Override: 10-Minute Garlic Noodles — Fast skillet noodles tossed with garlic, 
 ### 3.6 Test
 
 `RecipeApiApplicationTests.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi;
 
@@ -374,12 +406,13 @@ class RecipeApiApplicationTests {
 * Prefer **constructor injection**; it’s testable and avoids hidden state.
 * Keep your **`@SpringBootApplication`** in a top-level package to ensure component scanning finds your beans.
 * If you have multiple bean candidates, use **`@Primary`** or **`@Qualifier`** — don’t rely on “lucky” resolution.
-* Centralize “environment” values in **`application.properties`** and inject them with **`@Value`** (later we’ll switch to `@ConfigurationProperties`).
+* Centralize “environment” values in **`application.properties`** and inject them with **`@Value`** (later we’ll switch
+  to `@ConfigurationProperties`).
 * Use Gradle tasks like `./gradlew dependencies` and `./gradlew clean build` to inspect or rebuild your project.
 
 ---
 
-## 6) Checklist 
+## 6) Checklist
 
 * [x] Bootstrapped a Spring Boot project with Gradle & Java 17
 * [x] Understood IoC, DI, beans, and scanning
@@ -392,4 +425,5 @@ class RecipeApiApplicationTests {
 
 ## 7) Next Session Preview
 
-We’ll formalize the domain model and prepare for persistence with **Spring Data JPA**. Expect to design entities (Recipe, Ingredient, MeasurementUnit) and learn about repositories & derived queries.
+We’ll formalize the domain model and prepare for persistence with **Spring Data JPA**. Expect to design entities (
+Recipe, Ingredient, MeasurementUnit) and learn about repositories & derived queries.

@@ -1,18 +1,25 @@
 # Week 2 — Spring Data JPA & Repositories
 
-Today we extend our **Recipe API** project with persistence using **Spring Data JPA** and a MySQL database. This introduces **entities, repositories, and derived queries**. By the end of this session, your app will save and retrieve `Recipe` objects from a real database.
+Today we extend our **Recipe API** project with persistence using **Spring Data JPA** and a MySQL database. This
+introduces **entities, repositories, and derived queries**. By the end of this session, your app will save and retrieve
+`Recipe` objects from a real database.
 
 ---
 
 ## 1) Core Concepts
 
 ### What is JPA?
-The **Java Persistence API (JPA)** is the standard API for object-relational mapping (ORM). **Hibernate** is the most common JPA implementation used by Spring Boot.
+
+The **Java Persistence API (JPA)** is the standard API for object-relational mapping (ORM). **Hibernate** is the most
+common JPA implementation used by Spring Boot.
 
 ### Spring Data JPA
-Spring Data JPA builds on JPA/Hibernate and provides repository interfaces that handle CRUD operations without boilerplate code.
+
+Spring Data JPA builds on JPA/Hibernate and provides repository interfaces that handle CRUD operations without
+boilerplate code.
 
 ### Key Annotations
+
 - `@Entity` — marks a class as a persistent entity.
 - `@Id` — defines the primary key field.
 - `@GeneratedValue` — lets the database auto-generate IDs.
@@ -20,6 +27,7 @@ Spring Data JPA builds on JPA/Hibernate and provides repository interfaces that 
 - `@Repository` — marks repository interfaces for Spring Data JPA.
 
 ### Repository Interfaces
+
 - `CrudRepository<T, ID>` — basic CRUD methods (save, findById, findAll, delete).
 - `JpaRepository<T, ID>` — extends CrudRepository with paging and sorting.
 - Derived query methods like `findByNameContaining(String name)` work automatically.
@@ -34,7 +42,6 @@ Update **`application.properties`**:
 spring.datasource.url=jdbc:mysql://localhost:3306/recipe_api?useSSL=false&serverTimezone=UTC
 spring.datasource.username=root
 spring.datasource.password=your_password
-
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=true
 spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
@@ -55,6 +62,7 @@ spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
 package com.codingnomads.bootcamp.recipeapi.models;
 
 import jakarta.persistence.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -78,7 +86,8 @@ public class Recipe {
     private List<Ingredient> ingredients = new ArrayList<>();
 
     // Default constructor required by JPA
-    public Recipe() {}
+    public Recipe() {
+    }
 
     // Convenience constructor
     public Recipe(String name, String description) {
@@ -87,13 +96,29 @@ public class Recipe {
     }
 
     // Getters and setters
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    public Long getId() {
+        return id;
+    }
 
-    public List<Ingredient> getIngredients() { return ingredients; }
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public List<Ingredient> getIngredients() {
+        return ingredients;
+    }
 
     // Add an ingredient and set its recipe reference
     public void addIngredient(Ingredient ingredient) {
@@ -142,7 +167,8 @@ public class Ingredient {
     private Recipe recipe;
 
     // Default constructor required by JPA
-    public Ingredient() {}
+    public Ingredient() {
+    }
 
     // Convenience constructor
     public Ingredient(String name, double amount, String unit) {
@@ -152,16 +178,41 @@ public class Ingredient {
     }
 
     // Getters and setters
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public double getAmount() { return amount; }
-    public void setAmount(double amount) { this.amount = amount; }
-    public String getUnit() { return unit; }
-    public void setUnit(String unit) { this.unit = unit; }
+    public Long getId() {
+        return id;
+    }
 
-    public Recipe getRecipe() { return recipe; }
-    public void setRecipe(Recipe recipe) { this.recipe = recipe; }
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public double getAmount() {
+        return amount;
+    }
+
+    public void setAmount(double amount) {
+        this.amount = amount;
+    }
+
+    public String getUnit() {
+        return unit;
+    }
+
+    public void setUnit(String unit) {
+        this.unit = unit;
+    }
+
+    public Recipe getRecipe() {
+        return recipe;
+    }
+
+    public void setRecipe(Recipe recipe) {
+        this.recipe = recipe;
+    }
 }
 ```
 
@@ -200,53 +251,53 @@ import org.springframework.stereotype.Repository;
 public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
 }
 ```
+
 ### 3.4 Runner to Insert Test Data
-### 3.4 Runner to Insert Test Data
+
 `src/main/java/com/codingnomads/bootcamp/recipeapi/core/DataSeeder.java`
-`src/main/java/com/codingnomads/bootcamp/recipeapi/core/DataSeeder.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.core;
-package com.codingnomads.bootcamp.recipeapi.core;
+
 import com.codingnomads.bootcamp.recipeapi.models.Recipe;
 import com.codingnomads.bootcamp.recipeapi.models.Ingredient;
 import com.codingnomads.bootcamp.recipeapi.repositories.RecipeRepository;
-import org.springframework.boot.CommandLineRunner;ories.RecipeRepository;
-import org.springframework.stereotype.Component;r;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+
 // Seeds initial data into the database at application startup
 @Component
-public class DataSeeder implements CommandLineRunner {public class DataSeeder implements CommandLineRunner {
+public class DataSeeder implements CommandLineRunner {
 
-    private final RecipeRepository recipeRepository;    private final RecipeRepository recipeRepository;
+    private final RecipeRepository recipeRepository;
 
     // Injects the RecipeRepositorysitory) {
-    public DataSeeder(RecipeRepository recipeRepository) {   this.recipeRepository = recipeRepository;
-        this.recipeRepository = recipeRepository;    }
+    public DataSeeder(RecipeRepository recipeRepository) {
+        this.recipeRepository = recipeRepository;
     }
 
     // Runs on application startup
     @Override
-    public void run(String... args) {;
+    public void run(String... args) {
         // Only seed if no recipes exist);
         if (recipeRepository.count() == 0) {
-            Recipe recipe = new Recipe("Pancakes", "Fluffy pancakes");dient("Milk", 1.5, "cups"));
-            recipe.addIngredient(new Ingredient("Flour", 2, "cups"));            recipeRepository.save(recipe);
+            Recipe recipe = new Recipe("Pancakes", "Fluffy pancakes");
+            recipe.addIngredient(new Ingredient("Milk", 1.5, "cups"));
+            recipe.addIngredient(new Ingredient("Flour", 2, "cups"));
             recipe.addIngredient(new Ingredient("Eggs", 2, "pcs"));
-            recipe.addIngredient(new Ingredient("Milk", 1.5, "cups"));   System.out.println("Seeded recipe: " + recipe.getName());
-            recipeRepository.save(recipe);   }
-   }
+            recipe.addIngredient(new Ingredient("Milk", 1.5, "cups"));
+
             System.out.println("Seeded recipe: " + recipe.getName());
-        }```
+            recipeRepository.save(recipe);
+        }
     }
-}Run the app and check the MySQL table — the recipe and ingredients should be inserted!
+}
 ```
+
 ---
+
 Run the app and check the MySQL table — the recipe and ingredients should be inserted!
 
----- We’ll add **REST endpoints** in Week 3 to expose this data via controllers.
+We’ll add **REST endpoints** in Week 3 to expose this data via controllers.
 
-
-
-
-
-- We’ll add **REST endpoints** in Week 3 to expose this data via controllers.## 4) Next Steps
+## 4) Next Steps
