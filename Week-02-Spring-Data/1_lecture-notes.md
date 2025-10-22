@@ -24,7 +24,20 @@ boilerplate code.
 - `@Id` — defines the primary key field.
 - `@GeneratedValue` — lets the database auto-generate IDs.
 - `@OneToMany`, `@ManyToOne`, `@ManyToMany` — define relationships between entities.
+  - `mappedBy` - (declared on the child side of the relationship) sets field name of the parent class pointing to child.
+  - `fetch` - sets the fetch type for the relationship: `LAZY` (default) or `EAGER`
+  - `cascade` - sets list of operations that should be performed on the related entity when parent entity changed, 
+    default value is `[]` meaning no operations are performed. 
 - `@Repository` — marks repository interfaces for Spring Data JPA.
+- `@Transactional` - execute all database operations in the method in a transaction.
+
+### Fine Tune Annotations
+
+- `@Table` - provide table name.
+- `@Column` - provide column name.
+- `@Transient` - exclude a field from persistence.
+- `@JoinColumn` - specify the join column for a relationship.
+- `@JoinTable` - specify the join table for a relationship.
 
 ### Repository Interfaces
 
