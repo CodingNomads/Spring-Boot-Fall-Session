@@ -35,9 +35,9 @@ boilerplate code.
 
 - `@Table` - provide table name.
 - `@Column` - provide column name.
-- `@Transient` - exclude a field from persistence.
 - `@JoinColumn` - specify the join column for a relationship.
 - `@JoinTable` - specify the join table for a relationship.
+- `@Transient` - exclude a field from persistence.
 
 ### Repository Interfaces
 

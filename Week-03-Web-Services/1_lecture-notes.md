@@ -60,14 +60,14 @@ and efficient APIs for communication between systems over a network like the int
     - `/recipes/1/ingredients` - list of ingredients of recipe with id 1
     - `/recipes/1/ingredients/1` - ingredient with id 1 of recipe with id 1
     - etc.
-- **JSON** (JavaScript Object Notation) a text base representation of an data state
-  ([Mozilla.org: JSON](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON)
 - **HTTP verbs** — map to CRUD:
     - `GET` → Read
     - `POST` → Create
     - `PUT` → Update
     - `PATCH` → Partial update
     - `DELETE` → Delete
+- **JSON** (JavaScript Object Notation) a text base representation of an data state
+  ([Mozilla.org: JSON](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON)
 
 ### Status Codes
 
