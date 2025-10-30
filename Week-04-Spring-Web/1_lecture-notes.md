@@ -1,33 +1,75 @@
 # Week 4 — Spring Web: Controllers, ResponseEntity & Error Handling
 
-Today we refine the **web layer** of our Recipe API. We’ll learn the difference between `@Controller` and `@RestController`, how to return **custom responses** using `ResponseEntity`, and how to handle errors gracefully with `@ExceptionHandler` and `@ControllerAdvice`.
+Today we refine the **web layer** of our Recipe API. We’ll learn what is `@RestController`, how to return **custom 
+responses** using `ResponseEntity`, and how to handle errors gracefully with 
+`@ExceptionHandler` and `@ControllerAdvice`.
 
 ---
 
 ## 1) Core Concepts
 
-### @Controller vs. @RestController
-- `@Controller` — returns **views** (e.g., Thymeleaf templates) or forwards requests.
-- `@RestController` — shorthand for `@Controller + @ResponseBody`. It returns JSON (or other serialized data).
+### Handler customization via parameters and annotations
+
+#### Default behavior
+
+Use `@GetMapping`, `@PostMapping`, `@PatchMapping`, `@PutMapping`, `@DeleteMapping` to declare HTTP controller handlers.
+
+Controller functions, by `default` will:
+
+- consume `application/json`
+- produce `application/json`
+- return `200 OK`
+- map `return` type to JSON `body`
+
+#### Customization via parameters
+
+- `headers` to customize headers
+- `params` to customize query parameters
+- `consumes` to customize content types accepted
+- `produces` to customize content types returned
+
+#### Customization via annotations
+
+- `@RequestMapping` generic annotation to customize handler mapping
+- `@ResponseStatus` to customize response status code
+
+### Request data binding
+
+- `@CookieValue` to extract cookies
+- `@PathVariable` to extract variables from URL path
+- `@RequestParam` to extract query parameters
+- `@RequestBody` to extract request body
 
 ### ResponseEntity
-Wraps the response body with HTTP status codes and headers. Examples:
+
+Control response status codes and headers. The `ResponseEntity` class is a wrapper for HTTP responses.
+Examples:
+
 ```java
 return ResponseEntity.ok(object);
-return ResponseEntity.status(HttpStatus.CREATED).body(object);
-return ResponseEntity.notFound().build();
+
+return ResponseEntity.
+
+status(HttpStatus.CREATED).
+
+body(object);
+
+return ResponseEntity.
+
+notFound().
+
+build();
 ```
 
 ### Exception Handling
-- **Local error handling**: `@ExceptionHandler` inside a controller to handle specific exceptions.  
+
+- **Local error handling**: `@ExceptionHandler` inside a controller to handle specific exceptions.
 - **Global error handling**: `@ControllerAdvice` defines centralized error handling across controllers.
 
-### Common HTTP Status Codes
-- `200 OK` — success
-- `201 Created` — resource created
-- `400 Bad Request` — client sent invalid data
-- `404 Not Found` — resource missing
-- `500 Internal Server Error` — unexpected server failure
+### @Controller vs. @RestController
+
+- `@Controller` — returns **views** (e.g., Thymeleaf templates) or forwards requests.
+- `@RestController` — shorthand for `@Controller + @ResponseBody`. It returns JSON (or other serialized data).
 
 ---
 
@@ -36,6 +78,7 @@ return ResponseEntity.notFound().build();
 ### 2.1 Custom Exception
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/exceptions/RecipeNotFoundException.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.exceptions;
 
@@ -51,6 +94,7 @@ public class RecipeNotFoundException extends RuntimeException {
 ### 2.2 Controller with Exception Handling
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/controllers/RecipeController.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.controllers;
 
@@ -101,6 +145,7 @@ public class RecipeController {
 ### 2.3 Global Exception Handler
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/exceptions/GlobalExceptionHandler.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.exceptions;
 
@@ -148,6 +193,7 @@ curl http://localhost:8080/api/recipes/999
 ```
 
 Response:
+
 ```json
 {
   "timestamp": "2025-10-02T12:00:00",
@@ -159,4 +205,5 @@ Response:
 
 ## 4) Next Steps
 
-Next week, we’ll dive into **Spring MVC + Thymeleaf**, using `@Controller` to return views and bind form data to objects.
+Next week, we’ll dive into **Spring MVC + Thymeleaf**, using `@Controller` to return views and bind form data to
+objects.
