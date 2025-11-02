@@ -40,6 +40,120 @@ pages. We’ll add a simple UI to our Recipe API where users can view and create
 - `th:each` — Loop over a list: `<li th:each="recipe : ${recipes}">...</li>`
 - `th:href` / `th:src` — Build links/URLs: `<a th:href="@{/recipes/new}">New</a>`
 
+### Thymeleaf essentials: expressions, URLs (@{}), and method calls
+
+Thymeleaf supports several expression types. You’ll see these most often:
+
+- `${...}` — Variable (model) expression. Accesses data you put in the model (e.g., `model.addAttribute("recipe", r)`).
+    - Examples: `${recipe.name}`, `${recipes.size()}`
+- `*{...}` — Selection variable expression. Works inside a `th:object` scope so you can write shorter paths.
+    - Example: with `<form th:object="${recipe}">`, use `*{name}` instead of `${recipe.name}`.
+- `#{...}` — Message (i18n) expression. Reads from `messages.properties`.
+    - Example: `<h1 th:text="#{recipes.title}">Recipes</h1>`
+- `@{...}` — URL expression. Builds context-aware URLs (explained below).
+- `~{...}` — Fragment expression. Includes/replaces template fragments.
+
+#### What does `@{...}` mean?
+
+`@{...}` tells Thymeleaf to build a URL correctly for your app, taking into account the current context path and
+encoding.
+
+- Simple path:
+    - `<a th:href="@{/recipes}">All Recipes</a>` → `/recipes`
+- Path variable:
+    - `<a th:href="@{/recipes/{id}(id=${recipe.id})}">View</a>` → `/recipes/5`
+- Query parameters:
+    - `<a th:href="@{/recipes(search=${param.q}, page=${page})}">Search</a>` → `/recipes?search=omelette&page=2`
+- Static resource under `src/main/resources/static`:
+    - `<link rel="stylesheet" th:href="@{/css/app.css}">`
+- Form action:
+    - `<form th:action="@{/recipes}" method="post">` ensures the action points to the right base path.
+
+Tip: Prefer `th:href`/`th:src` with `@{...}` over raw `href`/`src` so links work even if your app runs under a context
+path (e.g., `/app`).
+
+#### Calling methods on model objects
+
+You can call zero-arg and arg methods on objects in the model. Thymeleaf uses Spring Expression Language (SpEL).
+
+- Property vs. getter: `${recipe.name}` resolves to `getName()` under the hood. You can also call `${recipe.getName()}`
+  explicitly.
+- Length and size:
+    - `${#strings.length(recipe.name)}`
+    - `${recipes.size()}` for a `List`.
+- Custom methods:
+    - If your model object has a method: `${recipe.formattedTitle()}`
+    - If you expose a Spring bean (e.g., a helper) via the model: `${formatHelper.abbreviate(recipe.description, 20)}`
+
+Important: Avoid calling methods with side effects from templates. Keep template expressions pure (no DB calls or state
+changes).
+
+#### Selection variable with `th:object` and `*{}`
+
+Inside a form or container with `th:object`, `*{}` expressions are relative to that object:
+
+```html
+
+<form th:action="@{/recipes}" th:object="${recipe}" method="post">
+    <input th:field="*{name}"/>
+    <input th:field="*{description}"/>
+</form>
+```
+
+This is equivalent to using `${recipe.name}` and `${recipe.description}`, but shorter.
+
+#### Useful utility objects
+
+Thymeleaf exposes helpers you can use anywhere:
+
+- `#strings` — string utilities: `${#strings.toUpperCase(recipe.name)}`
+- `#lists` — list helpers: `${#lists.isEmpty(recipes)}`
+- `#temporals` (Thymeleaf 3 + Java Time) — date/time formatting: `${#temporals.format(recipe.createdAt, 'yyyy-MM-dd')}`
+
+#### Iteration status in `th:each`
+
+You can capture the loop status to get index, odd/even, etc.:
+
+```html
+
+<li th:each="recipe, stat : ${recipes}" th:classappend="${stat.odd} ? 'odd' : 'even'">
+    <span th:text="${stat.index}">0</span>
+    <span th:text="${recipe.name}">Name</span>
+</li>
+```
+
+Available fields include `index`, `count`, `size`, `even`, `odd`, `first`, `last`.
+
+#### Conditionals and null-safety
+
+- `th:if` / `th:unless` to show/hide elements:
+    - `<p th:if="${#lists.isEmpty(recipes)}">No recipes yet.</p>`
+- Safe navigation and defaults:
+    - `${recipe?.description}` safely handles `null` `recipe`.
+    - `${recipe.description ?: 'No description'}` uses a default value if `description` is null.
+
+#### Attribute manipulation and locals
+
+- Append classes/attrs: `th:classappend="${highlight} ? ' highlight' : ''"`
+- Set multiple attributes at once: `th:attr="data-id=${recipe.id}, aria-label=${recipe.name}"`
+- Local variables with `th:with`:
+    - `<div th:with="shortDesc=${#strings.abbreviate(recipe.description, 30)}">`
+    - `<p th:text="${shortDesc}">desc</p>`
+
+#### Template fragments (brief)
+
+Define reusable pieces with `th:fragment` and include them with `th:insert`/`th:replace`:
+
+```html
+<!-- fragments/layout.html -->
+<header th:fragment="siteHeader">
+    <h1>Recipe App</h1>
+</header>
+
+<!-- any page -->
+<div th:replace="~{fragments/layout :: siteHeader}"></div>
+```
+
 ### Handling forms (quick overview)
 
 1) Show the form and put an empty object in the model:
