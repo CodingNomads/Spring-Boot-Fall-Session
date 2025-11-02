@@ -7,7 +7,9 @@ pages. We’ll add a simple UI to our Recipe API where users can view and create
 
 ## 1) Core Concepts
 
-### What is Spring MVC?
+### Core Spring MVC
+
+#### What is Spring MVC?
 
 - Spring MVC is Spring’s web framework that maps incoming HTTP requests to your Java methods and returns responses.
 - Request flow overview:
@@ -16,31 +18,38 @@ pages. We’ll add a simple UI to our Recipe API where users can view and create
     3) Your controller method prepares data (the Model) and returns a view name.
     4) A view resolver locates a Thymeleaf template and renders it with the model data into HTML.
 
-### MVC in one picture
+#### MVC in one picture
 
 - Model — The data you want to show (e.g., a list of `Recipe` objects).
 - View — The HTML page (a Thymeleaf template) that shows the data.
 - Controller — Receives requests, loads/saves data, and selects which view to render.
 
-### What is Thymeleaf?
+#### @Controller vs @RestController
+
+- `@Controller` — returns view names (renders HTML pages with Thymeleaf). Use for websites and forms.
+- `@RestController` — returns data (usually JSON). Use for APIs.
+
+### Thymeleaf
+
+#### What is Thymeleaf?
 
 - Thymeleaf is a server‑side template engine. It takes an HTML template + your data (Model) and outputs a final HTML
   page.
 - You add small attributes in HTML (e.g., `th:text`, `th:each`) to bind data to the page.
 
-### Folder conventions
+#### Folder conventions
 
 - Templates: `src/main/resources/templates/...`
 - Static files (CSS/JS/images): `src/main/resources/static/...`
 - If a controller returns the view name "recipes/list", Spring will look for `templates/recipes/list.html`.
 
-### Binding data in Thymeleaf (the 3 most used attributes)
+#### Binding data in Thymeleaf (the 3 most used attributes)
 
 - `th:text` — Put a value into an element: `<span th:text="${recipe.name}">Name</span>`
 - `th:each` — Loop over a list: `<li th:each="recipe : ${recipes}">...</li>`
 - `th:href` / `th:src` — Build links/URLs: `<a th:href="@{/recipes/new}">New</a>`
 
-### Thymeleaf essentials: expressions, URLs (@{}), and method calls
+#### Thymeleaf essentials: expressions, URLs (@{}), and method calls
 
 Thymeleaf supports several expression types. You’ll see these most often:
 
@@ -90,17 +99,7 @@ changes).
 
 #### Selection variable with `th:object` and `*{}`
 
-Inside a form or container with `th:object`, `*{}` expressions are relative to that object:
-
-```html
-
-<form th:action="@{/recipes}" th:object="${recipe}" method="post">
-    <input th:field="*{name}"/>
-    <input th:field="*{description}"/>
-</form>
-```
-
-This is equivalent to using `${recipe.name}` and `${recipe.description}`, but shorter.
+Inside a form or container with `th:object`, `*{}` expressions are relative to that object, so `*{name}` is equivalent to `${recipe.name}` when `th:object="${recipe}"` is set. See “Handling forms (quick overview)” below for a full example.
 
 #### Useful utility objects
 
@@ -154,7 +153,7 @@ Define reusable pieces with `th:fragment` and include them with `th:insert`/`th:
 <div th:replace="~{fragments/layout :: siteHeader}"></div>
 ```
 
-### Handling forms (quick overview)
+#### Handling forms (quick overview)
 
 1) Show the form and put an empty object in the model:
 
@@ -190,12 +189,8 @@ public String create(@ModelAttribute Recipe recipe) {
 }
 ```
 
-### `@Controller` vs `@RestController`
 
-- `@Controller` — returns view names (renders HTML pages with Thymeleaf). Use for websites and forms.
-- `@RestController` — returns data (usually JSON). Use for APIs.
-
-### Common gotchas (and quick fixes)
+#### Common gotchas (and quick fixes)
 
 - Every Thymeleaf page’s <html> tag should include `xmlns:th="http://www.thymeleaf.org"`.
 - If you return "recipes/list", the file must exist at `templates/recipes/list.html`.
@@ -207,7 +202,7 @@ public String create(@ModelAttribute Recipe recipe) {
 spring.thymeleaf.cache=false
 ```
 
-### Small glossary
+#### Small glossary
 
 - Model — Name→object map available to views (e.g., `model.addAttribute("recipes", list)`).
 - View — The template that renders HTML, selected by the view name returned from the controller.
