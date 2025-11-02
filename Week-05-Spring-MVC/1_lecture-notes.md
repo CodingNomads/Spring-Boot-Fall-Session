@@ -7,25 +7,98 @@ pages. We’ll add a simple UI to our Recipe API where users can view and create
 
 ## 1) Core Concepts
 
-### MVC Pattern
+### What is Spring MVC?
 
-- **Model**: The data (entities, DTOs).
-- **View**: The UI layer (HTML templates).
-- **Controller**: Handles HTTP requests, updates the model, and returns a view.
+- Spring MVC is Spring’s web framework that maps incoming HTTP requests to your Java methods and returns responses.
+- Request flow overview:
+    1) A request arrives at the `DispatcherServlet` (Spring’s front controller).
+    2) It finds a matching `@Controller` method based on the URL and HTTP method.
+    3) Your controller method prepares data (the Model) and returns a view name.
+    4) A view resolver locates a Thymeleaf template and renders it with the model data into HTML.
 
-### Thymeleaf
+### MVC in one picture
 
-Thymeleaf is a template engine for rendering dynamic content in Spring.
+- Model — The data you want to show (e.g., a list of `Recipe` objects).
+- View — The HTML page (a Thymeleaf template) that shows the data.
+- Controller — Receives requests, loads/saves data, and selects which view to render.
 
-- Templates go in `src/main/resources/templates`.
-- Use `th:text` to bind variables.
-- Use `th:each` to iterate over collections.
-- Use `th:action` and `th:object` for forms.
+### What is Thymeleaf?
 
-### @Controller vs. @RestController
+- Thymeleaf is a server‑side template engine. It takes an HTML template + your data (Model) and outputs a final HTML
+  page.
+- You add small attributes in HTML (e.g., `th:text`, `th:each`) to bind data to the page.
 
-- `@Controller`: returns **views** (Thymeleaf pages).
-- `@RestController`: returns JSON (for APIs).
+### Folder conventions
+
+- Templates: `src/main/resources/templates/...`
+- Static files (CSS/JS/images): `src/main/resources/static/...`
+- If a controller returns the view name "recipes/list", Spring will look for `templates/recipes/list.html`.
+
+### Binding data in Thymeleaf (the 3 most used attributes)
+
+- `th:text` — Put a value into an element: `<span th:text="${recipe.name}">Name</span>`
+- `th:each` — Loop over a list: `<li th:each="recipe : ${recipes}">...</li>`
+- `th:href` / `th:src` — Build links/URLs: `<a th:href="@{/recipes/new}">New</a>`
+
+### Handling forms (quick overview)
+
+1) Show the form and put an empty object in the model:
+
+```java
+
+@GetMapping("/new")
+public String showForm(Model model) {
+    model.addAttribute("recipe", new Recipe());
+    return "recipes/create";
+}
+```
+
+2) Bind inputs to object fields in the template:
+
+```html
+
+<form th:action="@{/recipes}" th:object="${recipe}" method="post">
+    <input th:field="*{name}"/>
+    <input th:field="*{description}"/>
+    <button type="submit">Save</button>
+    <!-- Make sure to include xmlns:th on <html> tag in the file -->
+</form>
+```
+
+3) Handle submission; Spring populates the object from form fields:
+
+```java
+
+@PostMapping
+public String create(@ModelAttribute Recipe recipe) {
+    recipeRepository.save(recipe);
+    return "redirect:/recipes"; // Redirect after POST to avoid resubmission
+}
+```
+
+### `@Controller` vs `@RestController`
+
+- `@Controller` — returns view names (renders HTML pages with Thymeleaf). Use for websites and forms.
+- `@RestController` — returns data (usually JSON). Use for APIs.
+
+### Common gotchas (and quick fixes)
+
+- Every Thymeleaf page’s <html> tag should include `xmlns:th="http://www.thymeleaf.org"`.
+- If you return "recipes/list", the file must exist at `templates/recipes/list.html`.
+- Prefer `th:href="@{/path}"` over plain `href` so links resolve correctly.
+- To redirect from a controller, return "redirect:/some/url".
+- In development, if template changes don’t show up, disable caching:
+
+```properties
+spring.thymeleaf.cache=false
+```
+
+### Small glossary
+
+- Model — Name→object map available to views (e.g., `model.addAttribute("recipes", list)`).
+- View — The template that renders HTML, selected by the view name returned from the controller.
+- ViewResolver — Maps view names like "recipes/list" to files under `templates/`.
+- Binding — Spring automatically fills an object (e.g., `Recipe`) from form fields.
 
 ---
 
@@ -117,7 +190,7 @@ public class WebRecipeController {
     </li>
 </ul>
 <!-- Link to the form for adding a new recipe -->
-<a href="/recipes/new">Add New Recipe</a>
+<a th:href="@{/recipes/new}">Add New Recipe</a>
 </body>
 </html>
 ```
