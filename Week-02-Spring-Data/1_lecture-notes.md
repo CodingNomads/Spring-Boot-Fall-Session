@@ -24,7 +24,7 @@ boilerplate code.
 - `@Id` — defines the primary key field.
 - `@GeneratedValue` — lets the database auto-generate IDs.
 - `@OneToMany`, `@ManyToOne`, `@ManyToMany` — define relationships between entities.
-  - `mappedBy` - (declared on the child side of the relationship) sets field name of the parent class pointing to child.
+  - `mappedBy` - declared on the inverse (non-owning) side of a bidirectional relationship; on the parent `@OneToMany`, it points to the child field name (e.g., `mappedBy = "recipe"`).
   - `fetch` - sets the fetch type for the relationship: `LAZY` (default) or `EAGER`
   - `cascade` - sets list of operations that should be performed on the related entity when parent entity changed, 
     default value is `[]` meaning no operations are performed. 
@@ -62,10 +62,10 @@ spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
 
 > Replace `root/your_password` with your own credentials.  
 > `ddl-auto=update` auto-creates/updates schema (convenient for dev).
-
 ---
 
 ## 3) Working Code Samples
+> Spring Boot usually auto-detects the Hibernate dialect; you can omit `spring.jpa.database-platform` or use `org.hibernate.dialect.MySQLDialect`.
 
 ### 3.1 Entity: Recipe
 
@@ -284,7 +284,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private final RecipeRepository recipeRepository;
 
-    // Injects the RecipeRepositorysitory) {
+    // Injects the RecipeRepository
     public DataSeeder(RecipeRepository recipeRepository) {
         this.recipeRepository = recipeRepository;
     }
@@ -292,13 +292,12 @@ public class DataSeeder implements CommandLineRunner {
     // Runs on application startup
     @Override
     public void run(String... args) {
-        // Only seed if no recipes exist);
+        // Only seed if no recipes exist.
         if (recipeRepository.count() == 0) {
             Recipe recipe = new Recipe("Pancakes", "Fluffy pancakes");
             recipe.addIngredient(new Ingredient("Milk", 1.5, "cups"));
             recipe.addIngredient(new Ingredient("Flour", 2, "cups"));
             recipe.addIngredient(new Ingredient("Eggs", 2, "pcs"));
-            recipe.addIngredient(new Ingredient("Milk", 1.5, "cups"));
 
             System.out.println("Seeded recipe: " + recipe.getName());
             recipeRepository.save(recipe);

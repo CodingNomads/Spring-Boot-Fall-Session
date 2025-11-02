@@ -1,25 +1,30 @@
 # Week 5 — Spring MVC & Thymeleaf
 
-Today we explore **Spring MVC (Model-View-Controller)** and integrate **Thymeleaf** templates to render dynamic HTML pages. We’ll add a simple UI to our Recipe API where users can view and create recipes through forms.
+Today we explore **Spring MVC (Model-View-Controller)** and integrate **Thymeleaf** templates to render dynamic HTML
+pages. We’ll add a simple UI to our Recipe API where users can view and create recipes through forms.
 
 ---
 
 ## 1) Core Concepts
 
 ### MVC Pattern
-- **Model**: The data (entities, DTOs).  
-- **View**: The UI layer (HTML templates).  
+
+- **Model**: The data (entities, DTOs).
+- **View**: The UI layer (HTML templates).
 - **Controller**: Handles HTTP requests, updates the model, and returns a view.
 
 ### Thymeleaf
-Thymeleaf is a template engine for rendering dynamic content in Spring.  
-- Templates go in `src/main/resources/templates`.  
-- Use `th:text` to bind variables.  
-- Use `th:each` to iterate over collections.  
+
+Thymeleaf is a template engine for rendering dynamic content in Spring.
+
+- Templates go in `src/main/resources/templates`.
+- Use `th:text` to bind variables.
+- Use `th:each` to iterate over collections.
 - Use `th:action` and `th:object` for forms.
 
 ### @Controller vs. @RestController
-- `@Controller`: returns **views** (Thymeleaf pages).  
+
+- `@Controller`: returns **views** (Thymeleaf pages).
 - `@RestController`: returns JSON (for APIs).
 
 ---
@@ -27,6 +32,7 @@ Thymeleaf is a template engine for rendering dynamic content in Spring.
 ## 2) Project Setup
 
 ### Add Thymeleaf dependency in `build.gradle`
+
 ```groovy
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
@@ -44,6 +50,7 @@ dependencies {
 ### 3.1 Controller for Views
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/controllers/WebRecipeController.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.controllers;
 
@@ -93,6 +100,7 @@ public class WebRecipeController {
 ### 3.2 Thymeleaf Templates
 
 `src/main/resources/templates/recipes/list.html`
+
 ```html
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
@@ -104,7 +112,7 @@ public class WebRecipeController {
 <ul>
     <!-- Iterates over recipes and displays their name and description -->
     <li th:each="recipe : ${recipes}">
-        <span th:text="${recipe.name}">Recipe Name</span> - 
+        <span th:text="${recipe.name}">Recipe Name</span> -
         <span th:text="${recipe.description}">Description</span>
     </li>
 </ul>
@@ -115,6 +123,7 @@ public class WebRecipeController {
 ```
 
 `src/main/resources/templates/recipes/create.html`
+
 ```html
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
@@ -143,19 +152,20 @@ public class WebRecipeController {
 
 ## 4) Binding Data with @ModelAttribute
 
-- `@ModelAttribute` binds form fields directly to Java objects.  
+- `@ModelAttribute` binds form fields directly to Java objects.
 - When we post the form, Spring populates the Recipe object with submitted values.
 
 ---
 
 ## 5) Testing
 
-1. Start app.  
-2. Visit `http://localhost:8080/recipes` → see recipe list.  
+1. Start app.
+2. Visit `http://localhost:8080/recipes` → see recipe list.
 3. Click **Add New Recipe**, submit form, and confirm the recipe is saved to DB.
 
 ---
 
 ## 6) Next Steps
 
-Next week, we’ll focus on **consuming external APIs** with RestTemplate/WebClient and integrating external data into our app.
+Next week, we’ll focus on **consuming external APIs** with RestTemplate/WebClient and integrating external data into our
+app.
