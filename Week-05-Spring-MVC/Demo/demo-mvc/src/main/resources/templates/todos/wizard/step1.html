@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Create Todo — Step 1</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; }
+        .container { max-width: 640px; margin: 0 auto; }
+        .actions { margin-top: 1rem; display:flex; gap:.5rem; }
+        label { display:block; margin:.5rem 0 .25rem; }
+        input[type=text] { width: 100%; padding:.5rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>New Todo — Step 1: Enter details</h1>
+
+    <form th:action="@{/todos/wizard/step1}" th:object="${todo}" method="post">
+        <label for="title">Title</label>
+        <input id="title" th:field="*{title}" type="text" placeholder="e.g., Buy milk" required>
+
+        <label>
+            <input type="checkbox" th:field="*{completed}"> Completed
+        </label>
+
+        <div class="actions">
+            <a th:href="@{/todos}">Cancel</a>
+            <button type="submit">Continue → Step 2</button>
+        </div>
+    </form>
+</div>
+</body>
+</html>
