@@ -29,97 +29,6 @@ pages. We’ll add a simple UI to our Recipe API where users can view and create
 - `@Controller` — returns view names (renders HTML pages with Thymeleaf). Use for websites and forms.
 - `@RestController` — returns data (usually JSON). Use for APIs.
 
-#### Server-side stateful storage (Model and Session)
-
-In Spring MVC, data you return to views typically lives in the request-scoped Model. For multi-step flows, you can also
-keep data in the HTTP session. Here are the key tools:
-
-- Request-scoped Model (default): data is available only for the current request/response.
-- Session (stateful): data persists across multiple requests from the same user until cleared or the session expires.
-
-Key annotations:
-
-- `@ModelAttribute`
-    - Parameter level: binds request parameters/form fields to an object parameter.
-        - Example: `public String create(@ModelAttribute Recipe recipe)` will populate `recipe` from form fields.
-    - Method level: runs before every handler in the controller to pre-populate the Model.
-        - Example:
-          ```java
-          @Controller
-          @RequestMapping("/recipes")
-          public class WebRecipeController {
-              private final RecipeRepository repo;
-              public WebRecipeController(RecipeRepository repo) { this.repo = repo; }
-    
-              // Adds common data to the model for all handler methods in this controller
-              @ModelAttribute("categories")
-              public List<String> categories() {
-                  return List.of("Breakfast", "Lunch", "Dinner");
-              }
-    
-              @GetMapping
-              public String list(Model model) {
-                  model.addAttribute("recipes", repo.findAll());
-                  return "recipes/list";
-              }
-          }
-          ```
-
-- `@SessionAttributes`
-    - Class level: marks specific model attribute names or types to be stored in the HTTP session across requests for
-      this controller.
-    - Use for short, conversational flows (e.g., multi-page form wizards). Remember to clear when done using
-      `SessionStatus#setComplete()`.
-        - Example:
-          ```java
-          @Controller
-          @RequestMapping("/cart")
-          @SessionAttributes("cart") // promote "cart" model attribute into the session
-          public class CartController {
-              @ModelAttribute("cart")
-              public Cart initCart() { return new Cart(); }
-    
-              @PostMapping("/add")
-              public String addItem(@ModelAttribute("cart") Cart cart, @RequestParam long itemId) {
-                  cart.add(itemId);
-                  return "redirect:/cart/view";
-              }
-    
-              @PostMapping("/checkout")
-              public String checkout(@ModelAttribute("cart") Cart cart, SessionStatus status) {
-                  // ... process cart
-                  status.setComplete(); // remove "cart" from session for this controller
-                  return "redirect:/";
-              }
-          }
-          ```
-
-- `@SessionAttribute`
-    - Parameter level: reads an attribute that already exists in the HTTP session (set earlier by your code, filters,
-      security, or another controller). Does NOT create it.
-    - Use `required = false` if it may be missing and handle null appropriately.
-        - Example:
-          ```java
-          @GetMapping("/profile")
-          public String profile(@SessionAttribute(name = "userId", required = false) Long userId, Model model) {
-              if (userId == null) return "redirect:/login";
-              // load user by id and add to model
-              return "users/profile";
-          }
-          ```
-
-Best practices:
-
-- Keep session usage minimal; prefer stateless requests for REST APIs. Session is fine for server-side rendered MVC
-  flows.
-- Avoid storing large objects or sensitive data directly in the session; store lightweight IDs instead.
-- Always clear `@SessionAttributes` data via `SessionStatus#setComplete()` when the flow finishes.
-
-References:
-
-- Spring MVC reference on `@ModelAttribute`, `@SessionAttributes`, and `@SessionAttribute`:
-  https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods.html
-
 ### Thymeleaf
 
 #### What is Thymeleaf?
@@ -148,8 +57,6 @@ Thymeleaf supports several expression types. You’ll see these most often:
     - Examples: `${recipe.name}`, `${recipes.size()}`
 - `*{...}` — Selection variable expression. Works inside a `th:object` scope so you can write shorter paths.
     - Example: with `<form th:object="${recipe}">`, use `*{name}` instead of `${recipe.name}`.
-- `#{...}` — Message (i18n) expression. Reads from `messages.properties`.
-    - Example: `<h1 th:text="#{recipes.title}">Recipes</h1>`
 - `@{...}` — URL expression. Builds context-aware URLs (explained below).
 - `~{...}` — Fragment expression. Includes/replaces template fragments.
 
@@ -206,11 +113,12 @@ Thymeleaf exposes helpers you can use anywhere:
 You can capture the loop status to get index, odd/even, etc.:
 
 ```html
-
-<li th:each="recipe, stat : ${recipes}" th:classappend="${stat.odd} ? 'odd' : 'even'">
-    <span th:text="${stat.index}">0</span>
-    <span th:text="${recipe.name}">Name</span>
-</li>
+<ul>
+    <li th:each="recipe, stat : ${recipes}" th:classappend="${stat.odd} ? 'odd' : 'even'">
+        <span th:text="${stat.index}">0</span>
+        <span th:text="${recipe.name}">Name</span>
+    </li>
+</ul>
 ```
 
 Available fields include `index`, `count`, `size`, `even`, `odd`, `first`, `last`.
@@ -301,6 +209,96 @@ spring.thymeleaf.cache=false
 - Binding — Spring automatically fills an object (e.g., `Recipe`) from form fields.
 
 ---
+
+### Server-side stateful storage (Model and Session)
+In Spring MVC, data you return to views typically lives in the request-scoped Model. For multi-step flows, you can also
+keep data in the HTTP session. Here are the key tools:
+
+- Request-scoped Model (default): data is available only for the current request/response.
+- Session (stateful): data persists across multiple requests from the same user until cleared or the session expires.
+
+Key annotations:
+
+- `@ModelAttribute`
+    - Parameter level: binds request parameters/form fields to an object parameter.
+        - Example: `public String create(@ModelAttribute Recipe recipe)` will populate `recipe` from form fields.
+    - Method level: runs before every handler in the controller to pre-populate the Model.
+        - Example:
+          ```java
+          @Controller
+          @RequestMapping("/recipes")
+          public class WebRecipeController {
+              private final RecipeRepository repo;
+              public WebRecipeController(RecipeRepository repo) { this.repo = repo; }
+    
+              // Adds common data to the model for all handler methods in this controller
+              @ModelAttribute("categories")
+              public List<String> categories() {
+                  return List.of("Breakfast", "Lunch", "Dinner");
+              }
+    
+              @GetMapping
+              public String list(Model model) {
+                  model.addAttribute("recipes", repo.findAll());
+                  return "recipes/list";
+              }
+          }
+          ```
+
+- `@SessionAttributes`
+    - Class level: marks specific model attribute names or types to be stored in the HTTP session across requests for
+      this controller.
+    - Use for short, conversational flows (e.g., multi-page form wizards). Remember to clear when done using
+      `SessionStatus#setComplete()`.
+        - Example:
+          ```java
+          @Controller
+          @RequestMapping("/cart")
+          @SessionAttributes("cart") // promote "cart" model attribute into the session
+          public class CartController {
+              @ModelAttribute("cart")
+              public Cart initCart() { return new Cart(); }
+    
+              @PostMapping("/add")
+              public String addItem(@ModelAttribute("cart") Cart cart, @RequestParam long itemId) {
+                  cart.add(itemId);
+                  return "redirect:/cart/view";
+              }
+    
+              @PostMapping("/checkout")
+              public String checkout(@ModelAttribute("cart") Cart cart, SessionStatus status) {
+                  // ... process cart
+                  status.setComplete(); // remove "cart" from session for this controller
+                  return "redirect:/";
+              }
+          }
+          ```
+
+- `@SessionAttribute`
+    - Parameter level: reads an attribute that already exists in the HTTP session (set earlier by your code, filters,
+      security, or another controller). Does NOT create it.
+    - Use `required = false` if it may be missing and handle null appropriately.
+        - Example:
+          ```java
+          @GetMapping("/profile")
+          public String profile(@SessionAttribute(name = "userId", required = false) Long userId, Model model) {
+              if (userId == null) return "redirect:/login";
+              // load user by id and add to model
+              return "users/profile";
+          }
+          ```
+
+Best practices:
+
+- Keep session usage minimal; prefer stateless requests for REST APIs. Session is fine for server-side rendered MVC
+  flows.
+- Avoid storing large objects or sensitive data directly in the session; store lightweight IDs instead.
+- Always clear `@SessionAttributes` data via `SessionStatus#setComplete()` when the flow finishes.
+
+References:
+
+- Spring MVC reference on `@ModelAttribute`, `@SessionAttributes`, and `@SessionAttribute`:
+  https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods.html
 
 ## 2) Project Setup
 
