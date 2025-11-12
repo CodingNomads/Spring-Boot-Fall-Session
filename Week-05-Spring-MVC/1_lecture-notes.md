@@ -211,6 +211,7 @@ spring.thymeleaf.cache=false
 ---
 
 ### Server-side stateful storage (Model and Session)
+
 In Spring MVC, data you return to views typically lives in the request-scoped Model. For multi-step flows, you can also
 keep data in the HTTP session. Here are the key tools:
 
