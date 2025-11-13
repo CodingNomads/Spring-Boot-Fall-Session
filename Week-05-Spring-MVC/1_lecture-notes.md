@@ -1,32 +1,310 @@
 # Week 5 — Spring MVC & Thymeleaf
 
-Today we explore **Spring MVC (Model-View-Controller)** and integrate **Thymeleaf** templates to render dynamic HTML pages. We’ll add a simple UI to our Recipe API where users can view and create recipes through forms.
+Today we explore **Spring MVC (Model-View-Controller)** and integrate **Thymeleaf** templates to render dynamic HTML
+pages. We’ll add a simple UI to our Recipe API where users can view and create recipes through forms.
 
 ---
 
 ## 1) Core Concepts
 
-### MVC Pattern
-- **Model**: The data (entities, DTOs).  
-- **View**: The UI layer (HTML templates).  
-- **Controller**: Handles HTTP requests, updates the model, and returns a view.
+### Core Spring MVC
+
+#### What is Spring MVC?
+
+- Spring MVC is Spring’s web framework that maps incoming HTTP requests to your Java methods and returns responses.
+- Request flow overview:
+    1) A request arrives at the `DispatcherServlet` (Spring’s front controller).
+    2) It finds a matching `@Controller` method based on the URL and HTTP method.
+    3) Your controller method prepares data (the Model) and returns a view name.
+    4) A view resolver locates a Thymeleaf template and renders it with the model data into HTML.
+
+#### MVC in one picture
+
+- Model — The data you want to show (e.g., a list of `Recipe` objects).
+- View — The HTML page (a Thymeleaf template) that shows the data.
+- Controller — Receives requests, loads/saves data, and selects which view to render.
+
+#### @Controller vs @RestController
+
+- `@Controller` — returns view names (renders HTML pages with Thymeleaf). Use for websites and forms.
+- `@RestController` — returns data (usually JSON). Use for APIs.
 
 ### Thymeleaf
-Thymeleaf is a template engine for rendering dynamic content in Spring.  
-- Templates go in `src/main/resources/templates`.  
-- Use `th:text` to bind variables.  
-- Use `th:each` to iterate over collections.  
-- Use `th:action` and `th:object` for forms.
 
-### @Controller vs. @RestController
-- `@Controller`: returns **views** (Thymeleaf pages).  
-- `@RestController`: returns JSON (for APIs).
+#### What is Thymeleaf?
+
+- Thymeleaf is a server‑side template engine. It takes an HTML template + your data (Model) and outputs a final HTML
+  page.
+- You add small attributes in HTML (e.g., `th:text`, `th:each`) to bind data to the page.
+
+#### Folder conventions
+
+- Templates: `src/main/resources/templates/...`
+- Static files (CSS/JS/images): `src/main/resources/static/...`
+- If a controller returns the view name "recipes/list", Spring will look for `templates/recipes/list.html`.
+
+#### Binding data in Thymeleaf (the 3 most used attributes)
+
+- `th:text` — Put a value into an element: `<span th:text="${recipe.name}">Name</span>`
+- `th:each` — Loop over a list: `<li th:each="recipe : ${recipes}">...</li>`
+- `th:href` / `th:src` — Build links/URLs: `<a th:href="@{/recipes/new}">New</a>`
+
+#### Thymeleaf essentials: expressions, URLs (@{}), and method calls
+
+Thymeleaf supports several expression types. You’ll see these most often:
+
+- `${...}` — Variable (model) expression. Accesses data you put in the model (e.g., `model.addAttribute("recipe", r)`).
+    - Examples: `${recipe.name}`, `${recipes.size()}`
+- `*{...}` — Selection variable expression. Works inside a `th:object` scope so you can write shorter paths.
+    - Example: with `<form th:object="${recipe}">`, use `*{name}` instead of `${recipe.name}`.
+- `@{...}` — URL expression. Builds context-aware URLs (explained below).
+- `~{...}` — Fragment expression. Includes/replaces template fragments.
+
+#### What does `@{...}` mean?
+
+`@{...}` tells Thymeleaf to build a URL correctly for your app, taking into account the current context path and
+encoding.
+
+- Simple path:
+    - `<a th:href="@{/recipes}">All Recipes</a>` → `/recipes`
+- Path variable:
+    - `<a th:href="@{/recipes/{id}(id=${recipe.id})}">View</a>` → `/recipes/5`
+- Query parameters:
+    - `<a th:href="@{/recipes(search=${param.q}, page=${page})}">Search</a>` → `/recipes?search=omelette&page=2`
+- Static resource under `src/main/resources/static`:
+    - `<link rel="stylesheet" th:href="@{/css/app.css}">`
+- Form action:
+    - `<form th:action="@{/recipes}" method="post">` ensures the action points to the right base path.
+
+Tip: Prefer `th:href`/`th:src` with `@{...}` over raw `href`/`src` so links work even if your app runs under a context
+path (e.g., `/app`).
+
+#### Calling methods on model objects
+
+You can call zero-arg and arg methods on objects in the model. Thymeleaf uses Spring Expression Language (SpEL).
+
+- Property vs. getter: `${recipe.name}` resolves to `getName()` under the hood. You can also call `${recipe.getName()}`
+  explicitly.
+- Length and size:
+    - `${#strings.length(recipe.name)}`
+    - `${recipes.size()}` for a `List`.
+- Custom methods:
+    - If your model object has a method: `${recipe.formattedTitle()}`
+    - If you expose a Spring bean (e.g., a helper) via the model: `${formatHelper.abbreviate(recipe.description, 20)}`
+
+Important: Avoid calling methods with side effects from templates. Keep template expressions pure (no DB calls or state
+changes).
+
+#### Selection variable with `th:object` and `*{}`
+
+Inside a form or container with `th:object`, `*{}` expressions are relative to that object, so `*{name}` is equivalent
+to `${recipe.name}` when `th:object="${recipe}"` is set. See “Handling forms (quick overview)” below for a full example.
+
+#### Useful utility objects
+
+Thymeleaf exposes helpers you can use anywhere:
+
+- `#strings` — string utilities: `${#strings.toUpperCase(recipe.name)}`
+- `#lists` — list helpers: `${#lists.isEmpty(recipes)}`
+- `#temporals` (Thymeleaf 3 + Java Time) — date/time formatting: `${#temporals.format(recipe.createdAt, 'yyyy-MM-dd')}`
+
+#### Iteration status in `th:each`
+
+You can capture the loop status to get index, odd/even, etc.:
+
+```html
+<ul>
+    <li th:each="recipe, stat : ${recipes}" th:classappend="${stat.odd} ? 'odd' : 'even'">
+        <span th:text="${stat.index}">0</span>
+        <span th:text="${recipe.name}">Name</span>
+    </li>
+</ul>
+```
+
+Available fields include `index`, `count`, `size`, `even`, `odd`, `first`, `last`.
+
+#### Conditionals and null-safety
+
+- `th:if` / `th:unless` to show/hide elements:
+    - `<p th:if="${#lists.isEmpty(recipes)}">No recipes yet.</p>`
+- Safe navigation and defaults:
+    - `${recipe?.description}` safely handles `null` `recipe`.
+    - `${recipe.description ?: 'No description'}` uses a default value if `description` is null.
+
+#### Attribute manipulation and locals
+
+- Append classes/attrs: `th:classappend="${highlight} ? ' highlight' : ''"`
+- Set multiple attributes at once: `th:attr="data-id=${recipe.id}, aria-label=${recipe.name}"`
+- Local variables with `th:with`:
+    - `<div th:with="shortDesc=${#strings.abbreviate(recipe.description, 30)}">`
+    - `<p th:text="${shortDesc}">desc</p>`
+
+#### Template fragments (brief)
+
+Define reusable pieces with `th:fragment` and include them with `th:insert`/`th:replace`:
+
+```html
+<!-- fragments/layout.html -->
+<header th:fragment="siteHeader">
+    <h1>Recipe App</h1>
+</header>
+
+<!-- any page -->
+<div th:replace="~{fragments/layout :: siteHeader}"></div>
+```
+
+#### Handling forms (quick overview)
+
+1) Show the form and put an empty object in the model:
+
+```java
+
+@GetMapping("/new")
+public String showForm(Model model) {
+    model.addAttribute("recipe", new Recipe());
+    return "recipes/create";
+}
+```
+
+2) Bind inputs to object fields in the template:
+
+```html
+
+<form th:action="@{/recipes}" th:object="${recipe}" method="post">
+    <input th:field="*{name}"/>
+    <input th:field="*{description}"/>
+    <button type="submit">Save</button>
+    <!-- Make sure to include xmlns:th on <html> tag in the file -->
+</form>
+```
+
+3) Handle submission; Spring populates the object from form fields:
+
+```java
+
+@PostMapping
+public String create(@ModelAttribute Recipe recipe) {
+    recipeRepository.save(recipe);
+    return "redirect:/recipes"; // Redirect after POST to avoid resubmission
+}
+```
+
+#### Common gotchas (and quick fixes)
+
+- Every Thymeleaf page’s <html> tag should include `xmlns:th="http://www.thymeleaf.org"`.
+- If you return "recipes/list", the file must exist at `templates/recipes/list.html`.
+- Prefer `th:href="@{/path}"` over plain `href` so links resolve correctly.
+- To redirect from a controller, return "redirect:/some/url".
+- In development, if template changes don’t show up, disable caching:
+
+```properties
+spring.thymeleaf.cache=false
+```
+
+#### Small glossary
+
+- Model — Name→object map available to views (e.g., `model.addAttribute("recipes", list)`).
+- View — The template that renders HTML, selected by the view name returned from the controller.
+- ViewResolver — Maps view names like "recipes/list" to files under `templates/`.
+- Binding — Spring automatically fills an object (e.g., `Recipe`) from form fields.
 
 ---
+
+### Server-side stateful storage (Model and Session)
+
+In Spring MVC, data you return to views typically lives in the request-scoped Model. For multi-step flows, you can also
+keep data in the HTTP session. Here are the key tools:
+
+- Request-scoped Model (default): data is available only for the current request/response.
+- Session (stateful): data persists across multiple requests from the same user until cleared or the session expires.
+
+Key annotations:
+
+- `@ModelAttribute`
+    - Parameter level: binds request parameters/form fields to an object parameter.
+        - Example: `public String create(@ModelAttribute Recipe recipe)` will populate `recipe` from form fields.
+    - Method level: runs before every handler in the controller to pre-populate the Model.
+        - Example:
+          ```java
+          @Controller
+          @RequestMapping("/recipes")
+          public class WebRecipeController {
+              private final RecipeRepository repo;
+              public WebRecipeController(RecipeRepository repo) { this.repo = repo; }
+    
+              // Adds common data to the model for all handler methods in this controller
+              @ModelAttribute("categories")
+              public List<String> categories() {
+                  return List.of("Breakfast", "Lunch", "Dinner");
+              }
+    
+              @GetMapping
+              public String list(Model model) {
+                  model.addAttribute("recipes", repo.findAll());
+                  return "recipes/list";
+              }
+          }
+          ```
+
+- `@SessionAttributes`
+    - Class level: marks specific model attribute names or types to be stored in the HTTP session across requests for
+      this controller.
+    - Use for short, conversational flows (e.g., multi-page form wizards). Remember to clear when done using
+      `SessionStatus#setComplete()`.
+        - Example:
+          ```java
+          @Controller
+          @RequestMapping("/cart")
+          @SessionAttributes("cart") // promote "cart" model attribute into the session
+          public class CartController {
+              @ModelAttribute("cart")
+              public Cart initCart() { return new Cart(); }
+    
+              @PostMapping("/add")
+              public String addItem(@ModelAttribute("cart") Cart cart, @RequestParam long itemId) {
+                  cart.add(itemId);
+                  return "redirect:/cart/view";
+              }
+    
+              @PostMapping("/checkout")
+              public String checkout(@ModelAttribute("cart") Cart cart, SessionStatus status) {
+                  // ... process cart
+                  status.setComplete(); // remove "cart" from session for this controller
+                  return "redirect:/";
+              }
+          }
+          ```
+
+- `@SessionAttribute`
+    - Parameter level: reads an attribute that already exists in the HTTP session (set earlier by your code, filters,
+      security, or another controller). Does NOT create it.
+    - Use `required = false` if it may be missing and handle null appropriately.
+        - Example:
+          ```java
+          @GetMapping("/profile")
+          public String profile(@SessionAttribute(name = "userId", required = false) Long userId, Model model) {
+              if (userId == null) return "redirect:/login";
+              // load user by id and add to model
+              return "users/profile";
+          }
+          ```
+
+Best practices:
+
+- Keep session usage minimal; prefer stateless requests for REST APIs. Session is fine for server-side rendered MVC
+  flows.
+- Avoid storing large objects or sensitive data directly in the session; store lightweight IDs instead.
+- Always clear `@SessionAttributes` data via `SessionStatus#setComplete()` when the flow finishes.
+
+References:
+
+- Spring MVC reference on `@ModelAttribute`, `@SessionAttributes`, and `@SessionAttribute`:
+  https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods.html
 
 ## 2) Project Setup
 
 ### Add Thymeleaf dependency in `build.gradle`
+
 ```groovy
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
@@ -44,6 +322,7 @@ dependencies {
 ### 3.1 Controller for Views
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/controllers/WebRecipeController.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.controllers;
 
@@ -93,6 +372,7 @@ public class WebRecipeController {
 ### 3.2 Thymeleaf Templates
 
 `src/main/resources/templates/recipes/list.html`
+
 ```html
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
@@ -104,17 +384,18 @@ public class WebRecipeController {
 <ul>
     <!-- Iterates over recipes and displays their name and description -->
     <li th:each="recipe : ${recipes}">
-        <span th:text="${recipe.name}">Recipe Name</span> - 
+        <span th:text="${recipe.name}">Recipe Name</span> -
         <span th:text="${recipe.description}">Description</span>
     </li>
 </ul>
 <!-- Link to the form for adding a new recipe -->
-<a href="/recipes/new">Add New Recipe</a>
+<a th:href="@{/recipes/new}">Add New Recipe</a>
 </body>
 </html>
 ```
 
 `src/main/resources/templates/recipes/create.html`
+
 ```html
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
@@ -143,19 +424,20 @@ public class WebRecipeController {
 
 ## 4) Binding Data with @ModelAttribute
 
-- `@ModelAttribute` binds form fields directly to Java objects.  
+- `@ModelAttribute` binds form fields directly to Java objects.
 - When we post the form, Spring populates the Recipe object with submitted values.
 
 ---
 
 ## 5) Testing
 
-1. Start app.  
-2. Visit `http://localhost:8080/recipes` → see recipe list.  
+1. Start app.
+2. Visit `http://localhost:8080/recipes` → see recipe list.
 3. Click **Add New Recipe**, submit form, and confirm the recipe is saved to DB.
 
 ---
 
 ## 6) Next Steps
 
-Next week, we’ll focus on **consuming external APIs** with RestTemplate/WebClient and integrating external data into our app.
+Next week, we’ll focus on **consuming external APIs** with RestTemplate/WebClient and integrating external data into our
+app.

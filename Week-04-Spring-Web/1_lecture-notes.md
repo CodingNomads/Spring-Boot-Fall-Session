@@ -1,7 +1,7 @@
 # Week 4 — Spring Web: Controllers, ResponseEntity & Error Handling
 
-Today we refine the **web layer** of our Recipe API. We’ll learn what is `@RestController`, how to return **custom 
-responses** using `ResponseEntity`, and how to handle errors gracefully with 
+Today we refine the **web layer** of our Recipe API. We’ll learn what is `@RestController`, how to return **custom
+responses** using `ResponseEntity`, and how to handle errors gracefully with
 `@ExceptionHandler` and `@ControllerAdvice`.
 
 ---
@@ -14,7 +14,8 @@ responses** using `ResponseEntity`, and how to handle errors gracefully with
 
 Use `@GetMapping`, `@PostMapping`, `@PatchMapping`, `@PutMapping`, `@DeleteMapping` to declare HTTP controller handlers.
 
-Controller functions, by `default` will:
+Controller functions in a `@RestController`, by default, serialize return values (usually JSON) with status `200 OK`.
+Content negotiation determines `produces` and `consumes` unless you constrain them explicitly.
 
 - consume `application/json`
 - produce `application/json`
@@ -48,17 +49,9 @@ Examples:
 ```java
 return ResponseEntity.ok(object);
 
-return ResponseEntity.
+return ResponseEntity.status(HttpStatus.CREATED).body(object);
 
-status(HttpStatus.CREATED).
-
-body(object);
-
-return ResponseEntity.
-
-notFound().
-
-build();
+return ResponseEntity.notFound().build();
 ```
 
 ### Exception Handling
@@ -106,6 +99,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.net.URI;
 
 // REST controller for Recipe resources with error handling
 @RestController
@@ -157,6 +151,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.net.URI;
 
 // Handles exceptions globally for all controllers
 @ControllerAdvice

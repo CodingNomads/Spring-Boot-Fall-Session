@@ -225,6 +225,9 @@ public class IngredientController {
 }
 ```
 
+> Tip: In Week 4 we improve `POST /api/recipes` to return `201 Created` and include a `Location` header using
+`ResponseEntity.created(...)`.
+
 ### 2.3 Testing the API
 
 Run the app and test with **cURL** or Postman:
