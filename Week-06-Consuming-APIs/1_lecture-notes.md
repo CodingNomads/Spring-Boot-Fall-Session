@@ -1,23 +1,27 @@
 # Week 6 — Consuming External APIs with RestTemplate & WebClient
 
-Today we learn how to **call external APIs** from our Spring Boot application using `RestTemplate` and `WebClient`. We’ll integrate a free external API (e.g., a nutrition or joke API) to fetch additional data for our recipes.
+Today we learn how to **call external APIs** from our Spring Boot application using `RestTemplate` and `WebClient`.
+We’ll integrate a free external API (e.g., a nutrition or joke API) to fetch additional data for our recipes.
 
 ---
 
 ## 1) Core Concepts
 
 ### RestTemplate (Blocking)
-- Traditional HTTP client included in Spring.  
-- Synchronous/blocking: waits for response before continuing.  
+
+- Traditional HTTP client included in Spring.
+- Synchronous/blocking: waits for response before continuing.
 - Still widely used but being gradually replaced by WebClient.
 
 ### WebClient (Reactive)
-- Non-blocking, asynchronous HTTP client.  
-- Part of Spring WebFlux.  
+
+- Non-blocking, asynchronous HTTP client.
+- Part of Spring WebFlux.
 - Recommended for new projects when you need high concurrency or reactive pipelines.
 
 ### JSON Mapping
-- Spring Boot auto-configures **Jackson** for JSON parsing.  
+
+- Spring Boot auto-configures **Jackson** for JSON parsing.
 - Responses can be mapped directly to Java objects (`POJOs`).
 
 ---
@@ -25,6 +29,7 @@ Today we learn how to **call external APIs** from our Spring Boot application us
 ## 2) Dependencies
 
 `build.gradle`
+
 ```groovy
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -41,6 +46,7 @@ dependencies {
 We’ll use the free **Chuck Norris Joke API** (`https://api.chucknorris.io/jokes/random`) as an example.
 
 Response JSON:
+
 ```json
 {
   "value": "Chuck Norris can write infinite loops... and have them end."
@@ -48,6 +54,7 @@ Response JSON:
 ```
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/dto/JokeResponse.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.dto;
 
@@ -57,15 +64,21 @@ public class JokeResponse {
     private String value;
 
     // Getter for the joke text
-    public String getValue() { return value; }
+    public String getValue() {
+        return value;
+    }
+
     // Setter for the joke text
-    public void setValue(String value) { this.value = value; }
+    public void setValue(String value) {
+        this.value = value;
+    }
 }
 ```
 
 ### 3.2 RestTemplate Example
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/services/JokeService.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.services;
 
@@ -93,6 +106,7 @@ public class JokeService {
 ### 3.3 Expose Joke in Controller
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/controllers/JokeController.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.controllers;
 
@@ -122,6 +136,7 @@ public class JokeController {
 ### 3.4 WebClient Example
 
 `src/main/java/com/codingnomads/bootcamp/recipeapi/services/JokeWebClientService.java`
+
 ```java
 package com.codingnomads.bootcamp.recipeapi.services;
 
@@ -157,6 +172,7 @@ curl http://localhost:8080/api/joke
 ```
 
 Response:
+
 ```text
 Chuck Norris can write infinite loops... and have them end.
 ```
@@ -165,12 +181,13 @@ Chuck Norris can write infinite loops... and have them end.
 
 ## 4) Best Practices
 
-- Use **DTOs** to map API responses.  
-- Handle exceptions (timeouts, 404s) with `.onStatus()` in WebClient or try/catch with RestTemplate.  
+- Use **DTOs** to map API responses.
+- Handle exceptions (timeouts, 404s) with `.onStatus()` in WebClient or try/catch with RestTemplate.
 - In real-world apps, avoid `.block()` and use **reactive streams** with WebClient.
 
 ---
 
 ## 5) Next Steps
 
-Next week, we’ll dive into **Spring Boot Testing & AOP**, ensuring our APIs work correctly with unit and integration tests.
+Next week, we’ll dive into **Spring Boot Testing & AOP**, ensuring our APIs work correctly with unit and integration
+tests.
