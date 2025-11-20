@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Header</title>
+</head>
+<body>
+<header th:fragment="navbar">
+    <nav>
+        <a href="/">Home</a> |
+        <a href="/todos">Todos</a> |
+        <a href="/todo-lists">Lists</a> |
+        <a href="/todos/new">+ Add Todo</a> |
+        <a href="/todo-lists/new">+ Add Todo List</a>
+    </nav>
+    <hr/>
+</header>
+</body>
+</html>
