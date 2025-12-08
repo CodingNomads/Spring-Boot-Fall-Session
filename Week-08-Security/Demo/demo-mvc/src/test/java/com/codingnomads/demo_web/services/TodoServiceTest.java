@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
 
-    @Mock // creates shell of the object
+    @Mock // creates a shell of the object
     //    @Spy // uses real object for all calls that were not mocked
     TodoRepository todoRepository;
 
