@@ -65,4 +65,13 @@ class TodoServiceTest {
         assertEquals(1, result.size());
         verify(todoRepository, times(1)).findAll();
     }
+
+    @Test
+    void getTodosWithoutList_exception() {
+        when(todoRepository.findAllWithoutList()).thenThrow(new RuntimeException());
+
+        assertThrows(RuntimeException.class, () -> todoService.getTodosWithoutList());
+
+        verify(todoRepository, times(1)).findAllWithoutList();
+    }
 }
