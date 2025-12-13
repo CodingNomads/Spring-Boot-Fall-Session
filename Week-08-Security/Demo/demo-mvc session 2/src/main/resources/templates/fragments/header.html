@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Header</title>
+</head>
+<body>
+<header th:fragment="navbar">
+    <nav>
+        <a th:href="@{/}">Home</a>
+        <span> | </span>
+        <a th:href="@{/todos}">Todos</a>
+        <span> | </span>
+        <a th:href="@{/todo-lists}">Lists</a>
+        <span> | </span>
+        <a th:href="@{/todos/new}">+ Add Todo</a>
+        <span> | </span>
+        <a th:href="@{/todo-lists/new}">+ Add Todo List</a>
+
+        <span sec:authorize="isAuthenticated()">
+            <span> | </span>
+            <form th:action="@{/logout}" method="post" style="display:inline;margin-left:0.5rem">
+                <button type="submit" aria-label="Log out">Logout</button>
+            </form>
+            <span> | </span>
+            <span>
+                Logged in as <b><span sec:authentication="name"></span></b>
+                <span sec:authentication="principal.authorities"></span>
+            </span>
+        </span>
+
+        <span sec:authorize="isAnonymous()">
+            <span> | </span>
+            <form th:action="@{/login}" method="get" style="display:inline">
+                <button type="submit" aria-label="Log in">Login</button>
+            </form>
+            <span> | </span>
+            <form th:action="@{/signup}" method="get" style="display:inline">
+                <button type="submit" aria-label="Sign up">Sign Up</button>
+            </form>
+        </span>
+
+    </nav>
+    <hr/>
+</header>
+</body>
+</html>
