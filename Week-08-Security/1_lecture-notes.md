@@ -225,6 +225,7 @@ Notes:
   entry point (e.g., `exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> res.sendError(401)))`).
 - If your tokens are issued by an external IdP (Auth0/Okta/Cognito), prefer Spring Security’s Resource Server (
   `oauth2ResourceServer().jwt()`) as shown below instead of a custom JWT filter.
+- Online tools for Decoding and Verifying JWTs: https://jwt.io/
 
 5) OAuth2 / OpenID Connect
 
