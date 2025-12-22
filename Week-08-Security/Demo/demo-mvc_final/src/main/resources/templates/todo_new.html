@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Create Todo</title>
+</head>
+<body>
+<div th:replace="fragments/layout :: layout(~{::section})">
+    <section>
+        <h1>Create a new Todo</h1>
+
+        <form th:action="@{/todos}" th:object="${todo}" method="post">
+            <div>
+                <label for="text">Text</label>
+                <input id="text" type="text" th:field="*{text}" placeholder="What needs to be done?" required />
+            </div>
+            <div>
+                <label for="done">Done</label>
+                <input id="done" type="checkbox" th:field="*{done}" />
+            </div>
+            <div>
+                <button type="submit">Create</button>
+                <a href="/todos">Back to list</a>
+            </div>
+        </form>
+    </section>
+</div>
+</body>
+</html>
