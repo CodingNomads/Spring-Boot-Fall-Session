@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Footer</title>
+</head>
+<body>
+<footer th:fragment="footer">
+    <div>
+        <hr/>
+        <p>
+            <small>&copy; Coding Nomads <span th:text="${#dates.format(#dates.createNow(), 'yyyy')}">2025</span> Demo
+                MVC App</small>
+        </p>
+    </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Admin</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            margin-bottom: 2rem
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px 8px
+        }
+
+        form {
+            display: inline
+        }
+    </style>
+</head>
+<body>
+<div th:replace="fragments/layout :: layout(~{::section})">
+    <section>
+        <h1>Admin</h1>
+
+        <h2>Users</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Roles</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="u : ${users}">
+                <td th:text="${u.id}">1</td>
+                <td th:text="${u.username}">user</td>
+                <td>
+                    <span th:each="r, ri : ${u.roles}" th:text="${r.name}"
+                          th:append="${!ri.last} ? ', ' : ''">ROLE_USER</span>
+                </td>
+                <td>
+                    <span th:text="${u.accountExpired} ? 'Expired' : 'Active'"></span>,
+                    <span th:text="${u.accountLocked} ? 'Locked' : 'Unlocked'"></span>,
+                    <span th:text="${u.credentialsExpired} ? 'Creds Expired' : 'Creds OK'"></span>
+                </td>
+                <td>
+                    <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}">Edit</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h2>API Tokens</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Issued</th>
+                <th>Expires</th>
+                <th>Valid</th>
+                <th>Revoked</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="t : ${tokens}">
+                <td th:text="${t.id}">1</td>
+                <td th:text="${t.user.username}">user</td>
+                <td th:text="${t.issuedAt}">now</td>
+                <td th:text="${t.expiresAt}">later</td>
+                <td th:with="now=${T(java.time.Instant).now()}"
+                    th:text="${!now.isBefore(t.issuedAt)} and ${!now.isAfter(t.expiresAt)}">true</td>
+                <td th:text="${t.revoked}">false</td>
+                <td>
+                    <form th:action="@{'/admin/tokens/' + ${t.id} + '/revoke'}" method="post">
+                        <button type="submit" th:disabled="${t.revoked}">Revoke</button>
+                    </form>
+                    <form th:action="@{'/admin/tokens/' + ${t.id} + '/delete'}" method="post"
+                          style="margin-left:0.5rem">
+                        <button type="submit">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</div>
+</body>
+</html>
