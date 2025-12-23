@@ -17,9 +17,10 @@ import org.springframework.stereotype.Component;
 public class LoggingAspect {
 
     /**
-     * This 'Around' advice runs both BEFORE and AFTER the target method.
-     * The pointcut expression identifies all methods or classes annotated with @Logged.
+     * This 'Around' advice is now disabled as we've moved to explicit service-level logging.
+     * It remains as a study example.
      */
+    /*
     @Around("@annotation(com.codingnomads.demo_web.logging.Logged) || @within(com.codingnomads.demo_web.logging.Logged)")
     public Object logExecutionTime(ProceedingJoinPoint joinPoint) throws Throwable {
         long tick = System.currentTimeMillis();
@@ -34,5 +35,6 @@ public class LoggingAspect {
 
         return result;
     }
+    */
 
 }

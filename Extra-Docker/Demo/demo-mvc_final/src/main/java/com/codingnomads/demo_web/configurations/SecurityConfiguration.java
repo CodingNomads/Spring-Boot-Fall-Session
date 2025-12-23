@@ -27,6 +27,10 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.slf4j.MDC;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import java.util.stream.Collectors;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -36,6 +40,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +50,7 @@ import java.util.Optional;
 /**
  * This class configures the security for our application.
  * It defines how different parts of the application (REST API vs. Web Pages) are protected.
- * 
+ * <p>
  * We use two separate 'SecurityFilterChains' to handle two different types of authentication:
  * 1. JWT-based (Stateless) for the /api/** endpoints.
  * 2. Session-based (Stateful) for the MVC web pages.
@@ -56,6 +61,13 @@ public class SecurityConfiguration {
 
     private final ObjectMapper objectMapper;
 
+//    @Bean
+//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+//        http.securityMatcher(EndpointRequest.toAnyEndpoint());
+//        http.authorizeHttpRequests((requests) -> requests.anyRequest().permitAll());
+//        return http.build();
+//    }
+
     /**
      * PasswordEncoder is used to securely hash passwords before storing them in the database.
      * BCrypt is a standard, strong hashing algorithm.
@@ -65,6 +77,33 @@ public class SecurityConfiguration {
         return new BCryptPasswordEncoder();
     }
 
+    @Bean
+    public OncePerRequestFilter mdcFilter() {
+        return new OncePerRequestFilter() {
+            @Override
+            protected void doFilterInternal(HttpServletRequest request,
+                                            HttpServletResponse response,
+                                            FilterChain filterChain) throws ServletException, IOException {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !(auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+                    MDC.put("username", auth.getName());
+                    String roles = auth.getAuthorities().stream()
+                            .map(GrantedAuthority::getAuthority)
+                            .collect(Collectors.joining(","));
+                    MDC.put("roles", roles);
+                }
+                MDC.put("route", request.getRequestURI());
+                try {
+                    filterChain.doFilter(request, response);
+                } finally {
+                    MDC.remove("username");
+                    MDC.remove("roles");
+                    MDC.remove("route");
+                }
+            }
+        };
+    }
+
     /**
      * Configuration for the REST API (/api/**).
      * It uses JWT (JSON Web Tokens) and is 'stateless', meaning the server doesn't remember the user between requests.
@@ -72,7 +111,7 @@ public class SecurityConfiguration {
      */
     @Bean
     @Order(1) // Higher priority to catch /api/** requests first
-    public SecurityFilterChain apiSecurity(HttpSecurity http, @Lazy OncePerRequestFilter jwtAuthenticationFilter) throws Exception {
+    public SecurityFilterChain apiSecurity(HttpSecurity http, @Lazy OncePerRequestFilter jwtAuthenticationFilter, OncePerRequestFilter mdcFilter) throws Exception {
         http
                 .securityMatcher("/api/**") // Only apply this chain to URLs starting with /api/
                 .csrf(AbstractHttpConfigurer::disable) // Disable CSRF as JWT is resistant to it and it's hard to use with APIs
@@ -88,6 +127,7 @@ public class SecurityConfiguration {
                 )
                 // Add our custom JWT filter before the standard username/password filter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(mdcFilter, UsernamePasswordAuthenticationFilter.class)
                 // Explicitly disable form login and logout for API as they are for browsers
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable);
@@ -101,15 +141,17 @@ public class SecurityConfiguration {
      */
     @Bean
     @Order(2) // Lower priority, catches everything else that wasn't /api/**
-    public SecurityFilterChain mvcSecurity(HttpSecurity http) throws Exception {
+    public SecurityFilterChain mvcSecurity(HttpSecurity http, OncePerRequestFilter mdcFilter) throws Exception {
         http
+                .addFilterAfter(mdcFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         // Permit access to static resources without logging in
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/favicon.ico").permitAll()
                         // Permit access to home, signup, and error pages
                         .requestMatchers("/", "/signup", "/errors").permitAll()
-                        // Only users with ADMIN role can access /admin/**
+                        // Only users with ADMIN role can access /admin/** and Actuator
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers(EndpointRequest.toAnyEndpoint()).hasRole("ADMIN")
                         // Everything else requires the user to be logged in
                         .anyRequest().authenticated())
                 .formLogin(login -> login
