@@ -78,155 +78,84 @@ Buildpacks** to create a production-ready image.
 
 ### 3) Orchestration with Docker Compose
 
-Most Spring Boot applications require a database (like MySQL). **Docker Compose** allows you to define and run
-multi-container applications.
+Modern Spring Boot applications often require multiple supporting services (databases, monitoring, logging). **Docker
+Compose** allows you to define and run multi-container applications with a single command.
 
-#### Step 1: Create `docker-compose.yml`
+The `demo-mvc_final` project uses a comprehensive Docker Compose setup including:
 
-In the project root, create a `docker-compose.yml` file:
+- **Application**: The Spring Boot app itself.
+- **Database**: MySQL 8.0 with health checks.
+- **Monitoring**: Spring Boot Admin for real-time application status.
+- **Logging & Metrics (ELK Stack)**: Elasticsearch, Kibana, Filebeat, and Metricbeat.
 
-```yaml
-services:
-  app:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/codingnomads
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=secret_password
-    depends_on:
-      db:
-        condition: service_healthy
+#### Running the Stack
 
-  db:
-    image: mysql:8.0
-    environment:
-      - MYSQL_DATABASE=codingnomads
-      - MYSQL_ROOT_PASSWORD=secret_password
-    ports:
-      - "3306:3306"
-    healthcheck:
-      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
-      timeout: 20s
-      retries: 10
-```
-
-#### Step 2: Run Locally
+In the project root, you can start all services:
 
 ```bash
 # Start everything in the background
 docker-compose up -d
 
-# View logs
+# View logs for the main application
 docker-compose logs -f app
 ```
 
----
+### 4) Monitoring with Spring Boot Admin
 
-### 4) Deploying Containers to AWS
+**Spring Boot Admin** is a community project that provides a web-based UI to manage and monitor Spring Boot
+applications. It pulls data from **Spring Boot Actuator** endpoints to provide a rich overview of the application's
+health and performance.
 
-The modern way to deploy containers on AWS is using **Amazon ECS (Elastic Container Service)** or **AWS App Runner**.
+#### Architecture
 
-#### Recommended Deployment Order
+1. **Admin Server**: A standalone Spring Boot application (run as a separate container in our stack) that collects data
+   from registered clients.
+2. **Admin Client**: Your application, which includes the `spring-boot-admin-starter-client` dependency and registers
+   itself with the server.
 
-For the smoothest setup, follow this order:
-1. **Push Image**: Ensure your container image is in ECR or Docker Hub.
-2. **Provision Database (RDS)**: Create the database first to get the **Endpoint**.
-3. **Deploy App (App Runner)**: Create the App Runner service last, so you can provide the DB endpoint as an environment variable during the initial setup.
+#### Key Features
 
-#### Step 1: Push Image to a Registry
+- **Health Status**: Real-time "UP" or "DOWN" status.
+- **Log Management**: View and change log levels (e.g., switch a package to `DEBUG`) on the fly without restarting.
+- **JVM Metrics**: Visualize heap usage, thread counts, and GC activity.
+- **Environment**: View all environment variables and configuration properties.
+- **HTTP Traces**: See recent requests and their response codes.
 
-Before a cloud provider can run your image, it must be stored in a registry.
+#### Configuration in `demo-mvc_final`
 
-##### Option A: Docker Hub (Global Public/Private Registry)
+**1. Dependency (`build.gradle`):**
 
-1. **Login**: `docker login` (Enter your Docker Hub username and password).
-2. **Tag your Image**:
-   ```bash
-   # Replace <username> with your Docker Hub username
-   docker tag demo-mvc-app:latest <username>/demo-mvc-app:latest
-   ```
-3. **Push the Image**:
-   ```bash
-   docker push <username>/demo-mvc-app:latest
-   ```
+```gradle
+implementation 'de.codecentric:spring-boot-admin-starter-client:3.5.6'
+```
 
-##### Option B: Amazon ECR (Private AWS Registry)
+**2. Client Registration (`application.properties`):**
 
-Before AWS can run your image from ECR, you must create a repository and authenticate.
+```properties
+# Points to the 'admin' service in Docker Compose
+spring.boot.admin.client.url=http://admin:8081
+# The URL where the Admin Server can reach this app
+spring.boot.admin.client.instance.service-url=http://localhost:8080
+```
 
-1. **Create a Repository**:
-    - Go to **Amazon ECR** → **Repositories** → **Create repository**.
-    - Name it `demo-mvc-app`.
-2. **Authenticate Docker to ECR**:
-    - Use the AWS CLI to get a login token (replace `<region>` and `<aws_account_id>`):
-      ```bash
-      aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<region>.amazonaws.com
-      ```
-3. **Tag your Image**:
-   ```bash
-   docker tag demo-mvc-app:latest <aws_account_id>.dkr.ecr.<region>.amazonaws.com/demo-mvc-app:latest
-   ```
-4. **Push the Image**:
-   ```bash
-   docker push <aws_account_id>.dkr.ecr.<region>.amazonaws.com/demo-mvc-app:latest
-   ```
+### 5) Observability: Logging and Metrics (ELK Stack)
 
-#### Step 2: Provision AWS RDS Aurora (Database)
+When running in containers, traditional log files on the host are less useful. Instead, we use centralized logging and
+monitoring.
 
-Before deploying the app, you need a managed database. AWS Aurora is a high-performance, auto-scaling relational database.
+- **Elasticsearch**: Stores and indexes logs and metrics.
+- **Kibana**: Accessible at `http://localhost:5601`. Used to visualize logs and metrics.
+- **Beats**: Filebeat collects logs from Docker containers, and Metricbeat collects performance metrics from the app and
+  system.
 
-1.  **Navigate to RDS**: Go to **Amazon RDS** → **Databases** → **Create database**.
-2.  **Choose a Creation Method**: **Standard create**.
-3.  **Engine Options**:
-    - Engine type: **Amazon Aurora**.
-    - Edition: **Amazon Aurora MySQL-Compatible Edition**.
-4.  **Templates**: Choose **Dev/Test** (or **Serverless** for cost-efficiency in small labs).
-5.  **Settings**:
-    - **DB cluster identifier**: `demo-mvc-db`.
-    - **Master username**: `admin`.
-    - **Master password**: Choose a strong password.
-6.  **Connectivity**:
-    - **Public access**: Select **Yes** (only for learning/labs; in production, keep it **No** and use VPC peering).
-    - **VPC security group**: Create new or select existing.
-7.  **Configure Security Group for App Runner**:
-    - After the DB is created, go to the **EC2 Console** → **Security Groups**.
-    - Find the security group used by your RDS instance.
-    - Add an **Inbound Rule**:
-        - **Type**: MySQL/Aurora (3306).
-        - **Source**: `0.0.0.0/0` (if Public Access is Yes) OR better, the specific IP of your environment.
-        - *Note*: For production-grade security with "Public access: No", you would use an **App Runner VPC Connector**.
-8.  **Create Database**: It may take a few minutes to provision.
-9.  **Get Endpoint**: Once created, click on the DB identifier and copy the **Endpoint** from the "Connectivity & security" tab.
-
-#### Step 3: Deploy using AWS App Runner (Easiest)
-
-AWS App Runner is the fastest way to get a containerized web app live.
-
-1.  **Create Service**: Go to **AWS App Runner** → **Create service**.
-2.  **Source**: Select **Container registry** and **Amazon ECR**.
-3.  **Image**: Browse for your `demo-mvc-app` image and select the `latest` tag.
-4.  **Deployment settings**: Choose **Manual** (or **Automatic** if you want it to redeploy whenever you push a new
-   image).
-5.  **Configuration**:
-    - **Port**: Set to `8080`.
-    - **Networking**:
-        - If your DB has **Public Access: Yes**, you can use **Public network**.
-        - If your DB is private, you must create a **VPC Connector** to allow App Runner to reach your VPC.
-    - **Environment Variables**: Add variables to connect to your AWS RDS Aurora instance:
-        - `SPRING_DATASOURCE_URL`: `jdbc:mysql://<aurora-endpoint>:3306/codingnomads`
-        - `SPRING_DATASOURCE_USERNAME`: `admin`
-        - `SPRING_DATASOURCE_PASSWORD`: `your_db_password`
-6.  **Review & Create**: Wait a few minutes, and AWS will provide a public URL for your app.
-
-pjYkI9no901OO1YxCKa3
+A specialized `kibana-setup` service automatically configures Data Views and Dashboards in Kibana upon startup.
 
 ---
 
-### 5) Helpful Docker Commands
+### 6) Helpful Docker Commands
 
-As you work with Docker, your system can accumulate unused images, containers, and volumes. Use these commands to keep your environment clean:
+As you work with Docker, your system can accumulate unused images, containers, and volumes. Use these commands to keep
+your environment clean:
 
 - **Check System Usage**: `docker system df` (Shows how much disk space is being used by Docker).
 - **Prune Everything**: `docker system prune` (Removes all stopped containers, unused networks, and dangling images).
@@ -235,7 +164,7 @@ As you work with Docker, your system can accumulate unused images, containers, a
 
 ---
 
-### 6) Best Practices
+### 7) Best Practices
 
 - **Multi-stage builds**: If using a `Dockerfile`, use a build stage to compile the code and a separate runtime stage to
   keep the final image size small.
