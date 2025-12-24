@@ -10,11 +10,12 @@ cloud.
 - **Docker Documentation**
   https://docs.docker.com/
 
-- **Spring Boot Docker Support**
-  https://docs.spring.io/spring-boot/docs/current/reference/html/container-images.html
+- **Spring Guide: Spring Boot with Docker**
+  https://spring.io/guides/gs/spring-boot-docker/
 
-- **AWS App Runner Documentation**
-  https://docs.aws.amazon.com/apprunner/
+- **Spring Boot Admin**
+  https://codecentric.github.io/spring-boot-admin/current/
+  https://docs.spring-boot-admin.com
 
 ---
 
@@ -30,15 +31,8 @@ cloud.
 
 ## Additional Resources
 
-- **Spring Guide: Spring Boot with Docker**
-  https://spring.io/guides/gs/spring-boot-docker/
-
 - **Baeldung: Dockerizing a Spring Boot Application**
   https://www.baeldung.com/dockerizing-spring-boot-application
 
 - **Paketo Buildpacks**
   https://paketo.io/
-
-- **Spring Boot Admin**
-  https://codecentric.github.io/spring-boot-admin/current/
-  https://docs.spring-boot-admin.com
