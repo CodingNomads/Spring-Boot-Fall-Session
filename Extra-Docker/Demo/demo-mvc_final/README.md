@@ -14,6 +14,8 @@ Java knowledge who are beginning their journey with the Spring Framework.
 - [🔐 Authentication](#-authentication)
 - [📚 Learning Points for Students](#-learning-points-for-students)
 - [🛠️ Configuration](#️-configuration)
+- [📊 Observability](#-observability)
+- [🐳 Docker Setup](#-docker-setup)
 - [📖 Appendix](#-appendix)
     - [Local MySQL Installation](#local-mysql-installation)
     - [Project Notes](#project-notes)
@@ -66,7 +68,8 @@ The database will be available at `localhost:3306` with the password `secret_pas
 
 #### Option 2: Local MySQL Installation
 
-If you prefer not to use Docker, you can use a local MySQL installation. See the [Appendix](#local-mysql-installation) for detailed setup
+If you prefer not to use Docker, you can use a local MySQL installation. See the [Appendix](#local-mysql-installation)
+for detailed setup
 instructions.
 
 ### Running the Application
@@ -111,6 +114,73 @@ As you explore this project, pay attention to:
 Most settings can be found in `src/main/resources/application.properties`. Check the comments there for explanations
 of "magical" constants.
 
+## 📊 Observability
+
+This project includes a pre-configured observability stack based on ELK (Elasticsearch, Logstash, Kibana) and Beats.
+
+### Components
+
+- **Elasticsearch**: The central search and analytics engine.
+- **Kibana**: The visualization platform to view logs and metrics.
+- **Filebeat**: Ships application logs (in JSON format) to Elasticsearch.
+- **Metricbeat**: Scrapes metrics from Spring Boot Actuator's Prometheus endpoint.
+
+### Accessing the Dashboards
+
+1. Ensure the stack is running: `docker-compose up -d`
+2. Access the following links to monitor the application:
+    * **[Actuator Discovery](http://localhost:8080/actuator)**: The entry point for Spring Boot Actuator. Use this to
+      discover available management endpoints. *Note: Requires `admin/admin` credentials.*
+    * **[Spring Boot Metrics Dashboard](http://localhost:5601/app/dashboards#/view/springboot-metrics)**: A
+      pre-configured Kibana dashboard showing JVM memory, CPU usage, HTTP requests, and more.
+    * **[Logs Discover Page](http://localhost:5601/app/discover)**: The Kibana Discover page where you can explore raw
+      application logs. Select the `filebeat-*` Data View to see the structured logs.
+
+### Secure Metrics Scrapping
+
+The `/actuator/**` endpoints are secured and require `ROLE_ADMIN`.
+
+- **Application**: Configured in `SecurityConfiguration.java` using HTTP Basic Auth for technical access.
+- **Metricbeat**: Configured in `metricbeat.yml` with the default `admin/admin` credentials to scrape
+  `/actuator/prometheus`.
+
+## 🐳 Docker Setup
+
+This project uses Docker Compose to manage the database and the observability stack.
+
+### 🛠️ Common Commands
+
+| Action                    | Command                      |
+|:--------------------------|:-----------------------------|
+| **Start everything**      | `docker-compose up -d`       |
+| **Stop everything**       | `docker-compose down`        |
+| **Stop & remove volumes** | `docker-compose down -v`     |
+| **View all logs**         | `docker-compose logs -f`     |
+| **View app logs**         | `docker-compose logs -f app` |
+| **Rebuild app**           | `docker-compose build app`   |
+| **Restart app**           | `docker-compose restart app` |
+
+### 🧹 Cleanup (Pruning)
+
+If you run out of disk space or want to clear unused Docker resources, use these commands:
+
+- **Remove unused data**:
+  ```bash
+  docker system prune
+  ```
+- **Remove all unused images** (not just dangling ones):
+  ```bash
+  docker image prune -a
+  ```
+- **Remove unused volumes**:
+  ```bash
+  docker volume prune
+  ```
+- **The "Nuke" Option** (removes all unused containers, networks, images, and volumes):
+  ```bash
+  docker system prune -a --volumes
+  ```
+
 ## 📖 Appendix
 
 ### Local MySQL Installation
@@ -131,7 +201,8 @@ If you choose not to use Docker, follow these steps to set up a local MySQL data
 
 ### Project Notes
 
-* The original package name `com.codingnomads.demo-web` was invalid for Java; this project uses `com.codingnomads.demo_web` instead.
+* The original package name `com.codingnomads.demo-web` was invalid for Java; this project uses
+  `com.codingnomads.demo_web` instead.
 
 ### Reference Guides & Resources
 
