@@ -105,6 +105,26 @@ public class SecurityConfiguration {
     }
 
     /**
+     * Configuration for Actuator endpoints.
+     * It uses Basic Auth for Metricbeat/observability tools.
+     */
+    @Bean
+    @Order(0) // Highest priority
+    public SecurityFilterChain actuatorSecurity(HttpSecurity http, OncePerRequestFilter mdcFilter) throws Exception {
+        http
+                .securityMatcher("/actuator/**")
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().hasRole("ADMIN")
+                )
+                .httpBasic(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterAfter(mdcFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /**
      * Configuration for the REST API (/api/**).
      * It uses JWT (JSON Web Tokens) and is 'stateless', meaning the server doesn't remember the user between requests.
      * Each request must include a token in the 'Authorization' header.
@@ -148,10 +168,9 @@ public class SecurityConfiguration {
                         // Permit access to static resources without logging in
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**", "/favicon.ico").permitAll()
                         // Permit access to home, signup, and error pages
-                        .requestMatchers("/", "/signup", "/errors").permitAll()
-                        // Only users with ADMIN role can access /admin/** and Actuator
+                        .requestMatchers("/", "/signup", "/error").permitAll()
+                        // Only users with ADMIN role can access /admin/**
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
                         // Everything else requires the user to be logged in
                         .anyRequest().authenticated())
                 .formLogin(login -> login

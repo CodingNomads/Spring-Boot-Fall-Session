@@ -7,6 +7,8 @@ metricbeat.modules:
   period: 10s
   hosts: ["app:8080"]
   metrics_path: /actuator/prometheus
+  username: "admin"
+  password: "admin"
 
 output.elasticsearch:
   hosts: ["elasticsearch:9200"]
