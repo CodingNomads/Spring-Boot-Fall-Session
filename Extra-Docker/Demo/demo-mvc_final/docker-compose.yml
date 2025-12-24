@@ -187,7 +187,7 @@ services:
               "title": "Spring Boot Metrics",
               "description": "Custom metrics dashboard for Spring Boot Actuator",
               "hits": 0,
-              "panelsJSON": "[{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":0,\"w\":12,\"h\":10,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_0\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":0,\"w\":12,\"h\":10,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":10,\"w\":12,\"h\":10,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{},\"panelRefName\":\"panel_2\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":10,\"w\":12,\"h\":10,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{},\"panelRefName\":\"panel_3\"}]",
+              "panelsJSON": "[{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":0,\"w\":12,\"h\":10,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_0\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":0,\"w\":12,\"h\":10,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":10,\"w\":12,\"h\":10,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{},\"panelRefName\":\"panel_2\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":10,\"w\":12,\"h\":10,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{},\"panelRefName\":\"panel_3\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":20,\"w\":12,\"h\":10,\"i\":\"5\"},\"panelIndex\":\"5\",\"embeddableConfig\":{},\"panelRefName\":\"panel_4\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":20,\"w\":12,\"h\":10,\"i\":\"6\"},\"panelIndex\":\"6\",\"embeddableConfig\":{},\"panelRefName\":\"panel_5\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":30,\"w\":12,\"h\":10,\"i\":\"7\"},\"panelIndex\":\"7\",\"embeddableConfig\":{},\"panelRefName\":\"panel_6\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":30,\"w\":12,\"h\":10,\"i\":\"8\"},\"panelIndex\":\"8\",\"embeddableConfig\":{},\"panelRefName\":\"panel_7\"}]",
               "optionsJSON": "{\"useMargins\":true,\"hidePanelTitles\":false}",
               "timeRestore": false,
               "kibanaSavedObjectMeta": { "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}" }
@@ -196,7 +196,11 @@ services:
               { "name": "panel_0", "type": "visualization", "id": "springboot-memory-usage" },
               { "name": "panel_1", "type": "visualization", "id": "springboot-cpu-usage" },
               { "name": "panel_2", "type": "visualization", "id": "springboot-http-requests" },
-              { "name": "panel_3", "type": "visualization", "id": "springboot-uptime" }
+              { "name": "panel_3", "type": "visualization", "id": "springboot-uptime" },
+              { "name": "panel_4", "type": "visualization", "id": "springboot-latency" },
+              { "name": "panel_5", "type": "visualization", "id": "springboot-threads" },
+              { "name": "panel_6", "type": "visualization", "id": "springboot-log-events" },
+              { "name": "panel_7", "type": "visualization", "id": "springboot-jdbc-connections" }
             ]
           }'
           
@@ -256,16 +260,76 @@ services:
             "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
           }'
 
+          # Visualization for HTTP Latency (Max)
+          LATENCY_VIS='{
+            "attributes": {
+              "title": "HTTP Request Latency (Max)",
+              "visState": "{\"title\":\"HTTP Request Latency (Max)\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Seconds\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.http_server_requests_seconds_max\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"},{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"params\":{\"field\":\"prometheus.labels.uri\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"},\"schema\":\"group\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for JVM Threads
+          THREADS_VIS='{
+            "attributes": {
+              "title": "JVM Live Threads",
+              "visState": "{\"title\":\"JVM Live Threads\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.jvm_threads_live_threads\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for Log Events
+          LOGS_VIS='{
+            "attributes": {
+              "title": "Log Events by Level",
+              "visState": "{\"title\":\"Log Events by Level\",\"type\":\"histogram\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"histogram\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"params\":{\"field\":\"prometheus.metrics.logback_events_total\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"},{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"params\":{\"field\":\"prometheus.labels.level\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"},\"schema\":\"group\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for JDBC Connections
+          JDBC_VIS='{
+            "attributes": {
+              "title": "JDBC Active Connections",
+              "visState": "{\"title\":\"JDBC Active Connections\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.jdbc_connections_active\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
           # Create Visualizations
-          for VIS in MEMORY_VIS CPU_VIS HTTP_VIS UPTIME_VIS; do
-            case $$VIS in
+          for VIS_NAME in MEMORY_VIS CPU_VIS HTTP_VIS UPTIME_VIS LATENCY_VIS THREADS_VIS LOGS_VIS JDBC_VIS; do
+            case $$VIS_NAME in
               MEMORY_VIS) ID="springboot-memory-usage"; PAYLOAD=$$MEMORY_VIS ;;
               CPU_VIS) ID="springboot-cpu-usage"; PAYLOAD=$$CPU_VIS ;;
               HTTP_VIS) ID="springboot-http-requests"; PAYLOAD=$$HTTP_VIS ;;
               UPTIME_VIS) ID="springboot-uptime"; PAYLOAD=$$UPTIME_VIS ;;
+              LATENCY_VIS) ID="springboot-latency"; PAYLOAD=$$LATENCY_VIS ;;
+              THREADS_VIS) ID="springboot-threads"; PAYLOAD=$$THREADS_VIS ;;
+              LOGS_VIS) ID="springboot-log-events"; PAYLOAD=$$LOGS_VIS ;;
+              JDBC_VIS) ID="springboot-jdbc-connections"; PAYLOAD=$$JDBC_VIS ;;
             esac
             
-            CLEAN_VIS_PAYLOAD=$$(echo "$$PAYLOAD" | tr -d '\n' | sed 's/  */ /g')
+            CLEAN_VIS_PAYLOAD=$(echo "$$PAYLOAD" | tr -d '\n' | sed 's/  */ /g')
             curl -s -X POST "http://kibana:5601/api/saved_objects/visualization/$$ID?overwrite=true" \
               -H "kbn-xsrf: true" -H "Content-Type: application/json" \
               -d "$$CLEAN_VIS_PAYLOAD" > /dev/null
