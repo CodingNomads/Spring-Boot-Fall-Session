@@ -16,6 +16,8 @@ services:
         condition: service_healthy
       kibana-setup:
         condition: service_completed_successfully
+      admin:
+        condition: service_started
 
   db:
     image: mysql:8.0
@@ -28,6 +30,18 @@ services:
       test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
       timeout: 20s
       retries: 10
+
+  admin:
+    image: codecentric/spring-boot-admin:3.4.1
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1

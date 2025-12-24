@@ -15,7 +15,8 @@ Java knowledge who are beginning their journey with the Spring Framework.
 - [🔐 Security & Access](#-security--access)
     - [Authentication (Web & JWT)](#-authentication)
     - [Management Endpoints (Actuator)](#-secure-metrics-scrapping)
-- [📊 Monitoring & Observability](#-observability)
+- [📊 Monitoring & Observability](#-monitoring--observability)
+- [🖥️ Spring Boot Admin](#-spring-boot-admin)
 - [📚 Learning Points](#-learning-points-for-students)
 - [📖 Appendix](#-appendix)
 
@@ -145,6 +146,23 @@ This project includes a pre-configured observability stack based on ELK (Elastic
       Kibana dashboard showing JVM memory, CPU usage, HTTP requests, and more.
     * **[Logs Discover Page](http://localhost:5601/app/discover)**: Explore raw application logs using the `filebeat-*`
       Data View.
+
+## 🖥️ Spring Boot Admin
+
+The project includes **Spring Boot Admin (SBA)**, which provides a comprehensive UI for managing and monitoring the
+application.
+
+* **Access SBA UI**: [http://localhost:8081](http://localhost:8081)
+* **Automatic Registration**: The application is configured to register itself with SBA on startup.
+* **Secured Access**: SBA uses the `admin/admin` credentials (configured via metadata in `application.properties`) to
+  authenticate against the application's secured `/actuator` endpoints.
+
+### What to see in SBA:
+
+- **Insights**: Detailed view of Health, Details, and JVM metrics.
+- **Environment**: Browse and search environment variables and system properties.
+- **Loggers**: View and change logging levels at runtime.
+- **Threads**: Interactive thread dump and state visualization.
 
 ## 📚 Learning Points for Students
 
