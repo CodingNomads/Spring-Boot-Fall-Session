@@ -5,25 +5,6 @@ cloud.
 
 ---
 
-## CodingNomads Lessons
-
-- **Docker Fundamentals**
-
-* https://codingnomads.com/what-is-docker
-* https://codingnomads.com/docker-images-vs-containers
-
-- **Containerizing Spring Boot**
-
-* https://codingnomads.com/spring-boot-docker
-* https://codingnomads.com/video/spring-boot-docker-video
-
-- **Docker Compose**
-
-* https://codingnomads.com/docker-compose-with-spring-boot
-* https://codingnomads.com/video/docker-compose-video
-
----
-
 ## Official Documentation
 
 - **Docker Documentation**
@@ -57,3 +38,7 @@ cloud.
 
 - **Paketo Buildpacks**
   https://paketo.io/
+
+- **Spring Boot Admin**
+  https://codecentric.github.io/spring-boot-admin/current/
+  https://docs.spring-boot-admin.com
