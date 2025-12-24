@@ -1,0 +1,15 @@
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+metricbeat.modules:
+- module: prometheus
+  period: 10s
+  hosts: ["app:8080"]
+  metrics_path: /actuator/prometheus
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+
+setup.kibana:
+  host: "kibana:5601"

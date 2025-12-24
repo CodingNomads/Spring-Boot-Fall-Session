@@ -151,7 +151,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/", "/signup", "/errors").permitAll()
                         // Only users with ADMIN role can access /admin/** and Actuator
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers(EndpointRequest.toAnyEndpoint()).hasRole("ADMIN")
+                        .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
                         // Everything else requires the user to be logged in
                         .anyRequest().authenticated())
                 .formLogin(login -> login

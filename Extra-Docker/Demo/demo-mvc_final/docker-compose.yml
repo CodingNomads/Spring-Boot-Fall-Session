@@ -1,0 +1,280 @@
+services:
+
+  app:
+    build: .
+    #    image: nikitabaranov/demo-mvc_final-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/codingnomads
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=secret_password
+    depends_on:
+      db:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+      kibana-setup:
+        condition: service_completed_successfully
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=codingnomads
+      - MYSQL_ROOT_PASSWORD=secret_password
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:5601/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kibana-setup:
+    image: curlimages/curl:latest
+    depends_on:
+      kibana:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo '[INFO] Starting kibana-setup...';
+        
+        echo '[INFO] Waiting for Kibana to be ready...';
+        until curl -s http://kibana:5601/api/status | grep -q '\"level\":\"available\"'; do
+          echo '[DEBUG] Kibana is not ready yet. Retrying in 5 seconds...';
+          sleep 5;
+        done;
+        echo '[INFO] Kibana is ready!';
+
+        echo '[INFO] Waiting for Filebeat indices to be created in Elasticsearch...';
+        until curl -s http://elasticsearch:9200/_cat/indices/filebeat-* | grep -q 'filebeat-'; do
+          echo '[DEBUG] No filebeat-* indices found yet. Retrying in 5 seconds...';
+          sleep 5;
+        done;
+        echo '[INFO] Filebeat indices found!';
+        
+        echo '[INFO] Waiting for Metricbeat indices to be created in Elasticsearch...';
+        until curl -s http://elasticsearch:9200/_cat/indices/metricbeat-* | grep -q 'metricbeat-'; do
+          echo '[DEBUG] No metricbeat-* indices found yet. Retrying in 5 seconds...';
+          sleep 5;
+        done;
+        echo '[INFO] Metricbeat indices found!';
+
+        echo '[INFO] Attempting to create Filebeat Data View...';
+        PAYLOAD='{"data_view": {"title": "filebeat-*", "name": "Filebeat Logs", "timeFieldName": "@timestamp"}}'
+        echo "[DEBUG] POST Payload: $$PAYLOAD"
+        RESPONSE=$$(curl -s -X POST 'http://kibana:5601/api/data_views/data_view' \
+          -H 'kbn-xsrf: true' \
+          -H 'Content-Type: application/json' \
+          -d "$$PAYLOAD");
+        
+        # echo "[DEBUG] POST Response: $$RESPONSE";
+        DATA_VIEW_ID=$$(echo "$$RESPONSE" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4);
+        
+        if [ -z "$$DATA_VIEW_ID" ]; then
+           echo "[WARN] Data View creation did not return an ID. It might already exist. Fetching all Data Views...";
+           RESPONSE=$$(curl -s -X GET 'http://kibana:5601/api/data_views' -H 'kbn-xsrf: true');
+           
+           echo "[INFO] Searching for existing filebeat-* Data View ID...";
+           # Find the data view that has the title "filebeat-*"
+           DATA_VIEW_ID=$$(echo "$$RESPONSE" | grep -o '{[^{}]*"title":"filebeat-\*"[^{}]*}' | grep -o '"id":"[^"]*"' | head -n1 | cut -d'"' -f4);
+           
+           if [ -z "$$DATA_VIEW_ID" ]; then
+             echo "[WARN] Precise match failed. Trying fallback extraction...";
+             DATA_VIEW_ID=$$(echo "$$RESPONSE" | grep -o '"id":"[^"]*"' | head -n1 | cut -d'"' -f4);
+           fi
+        fi
+        
+        if [ -n "$$DATA_VIEW_ID" ] && [ $${#DATA_VIEW_ID} -lt 100 ]; then
+          echo "[INFO] Using Data View ID: $$DATA_VIEW_ID";
+
+          # Set the default index and default columns for the space
+          echo "[INFO] Setting Filebeat Data View as default and configuring default columns...";
+          curl -s -X POST "http://kibana:5601/api/kibana/settings" \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d "{\"changes\":{\"defaultIndex\":\"$$DATA_VIEW_ID\",\"defaultColumns\":[\"service.name\",\"http.route\",\"user.name\",\"user.roles\",\"message\"]}}";
+
+          echo "[INFO] Creating or updating Saved Search 'Default App Search'...";
+          
+          # Explicitly define columns in both attributes and searchSourceJSON
+          SEARCH_PAYLOAD='{
+            "attributes": {
+              "title": "Default App Search",
+              "description": "Preconfigured search with user and service info",
+              "hits": 0,
+              "columns": ["service.name", "http.route", "user.name", "user.roles", "message"],
+              "sort": [["@timestamp", "desc"]],
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\",\"columns\":[\"service.name\",\"http.route\",\"user.name\",\"user.roles\",\"message\"]}"
+              }
+            },
+            "references": [
+              {
+                "name": "kibanaSavedObjectMeta.searchSource.index",
+                "type": "index-pattern",
+                "id": "'$$DATA_VIEW_ID'"
+              }
+            ]
+          }'
+          
+          # Remove newlines and extra spaces from payload to ensure it is valid for curl
+          CLEAN_PAYLOAD=$$(echo "$$SEARCH_PAYLOAD" | tr -d '\n' | sed 's/  */ /g')
+          
+          echo "[DEBUG] Saved Search Payload: $$CLEAN_PAYLOAD"
+          
+          FINAL_RESPONSE=$$(curl -s -X POST "http://kibana:5601/api/saved_objects/search/default-app-search?overwrite=true" \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d "$$CLEAN_PAYLOAD");
+            
+          echo "[DEBUG] Final Response: $$FINAL_RESPONSE";
+          
+          if echo "$$FINAL_RESPONSE" | grep -q '"id":"default-app-search"'; then
+            echo "[INFO] Successfully created/updated Saved Search.";
+          else
+            echo "[ERROR] Failed to create/update Saved Search. See response above.";
+            exit 1
+          fi
+
+          echo "[INFO] Attempting to create Metricbeat Data View...";
+          METRIC_PAYLOAD='{"data_view": {"title": "metricbeat-*", "name": "Metricbeat Data", "timeFieldName": "@timestamp"}}'
+          curl -s -X POST 'http://kibana:5601/api/data_views/data_view' \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d "$$METRIC_PAYLOAD";
+          echo "[INFO] Metricbeat Data View created.";
+
+          echo "[INFO] Creating Spring Boot Metrics Dashboard...";
+          # Define visualizations and dashboard for Spring Boot metrics
+          # We use simple Metric visualizations for the sake of script stability
+          
+          DASHBOARD_PAYLOAD='{
+            "attributes": {
+              "title": "Spring Boot Metrics",
+              "description": "Custom metrics dashboard for Spring Boot Actuator",
+              "hits": 0,
+              "panelsJSON": "[{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":10,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_0\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":10,\"w\":24,\"h\":10,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"}]",
+              "optionsJSON": "{\"useMargins\":true,\"hidePanelTitles\":false}",
+              "timeRestore": false,
+              "kibanaSavedObjectMeta": { "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}" }
+            },
+            "references": [
+              {
+                "name": "panel_0",
+                "type": "visualization",
+                "id": "springboot-memory-usage"
+              },
+              {
+                "name": "panel_1",
+                "type": "visualization",
+                "id": "springboot-cpu-usage"
+              }
+            ]
+          }'
+          
+          # Visualization for JVM Memory
+          MEMORY_VIS='{
+            "attributes": {
+              "title": "JVM Memory Usage",
+              "visState": "{\"title\":\"JVM Memory Usage\",\"type\":\"area\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"area\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Bytes\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.jvm_memory_used_bytes\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": \"'$$DATA_VIEW_ID'\" } ]
+          }'
+
+          # Visualization for CPU Usage
+          CPU_VIS='{
+            "attributes": {
+              "title": "CPU Usage",
+              "visState": "{\"title\":\"CPU Usage\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Usage %\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.system_cpu_usage\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": \"'$$DATA_VIEW_ID'\" } ]
+          }'
+
+          # Create Memory Visualization
+          curl -s -X POST "http://kibana:5601/api/saved_objects/visualization/springboot-memory-usage?overwrite=true" \
+            -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+            -d "$$MEMORY_VIS" > /dev/null
+            
+          # Create CPU Visualization
+          curl -s -X POST "http://kibana:5601/api/saved_objects/visualization/springboot-cpu-usage?overwrite=true" \
+            -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+            -d "$$CPU_VIS" > /dev/null
+            
+          # Create Dashboard
+          curl -s -X POST "http://kibana:5601/api/saved_objects/dashboard/springboot-metrics?overwrite=true" \
+            -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+            -d "$$DASHBOARD_PAYLOAD" > /dev/null
+            
+          echo "[INFO] Spring Boot Metrics Dashboard created successfully."
+        else
+          echo "[ERROR] Failed to retrieve Data View ID. Cannot proceed with Saved Search creation.";
+          exit 1
+        fi
+        echo '[INFO] kibana-setup completed successfully.'
+        
+  metricbeat-setup:
+    image: docker.elastic.co/beats/metricbeat:8.11.1
+    user: root
+    depends_on:
+      kibana:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+    volumes:
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+    command: setup -e
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.1
+    user: root
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    depends_on:
+      - elasticsearch
+
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:8.11.1
+    user: root
+    volumes:
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - elasticsearch
+      - app
