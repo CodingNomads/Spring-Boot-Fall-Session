@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>My Profile</title>
+</head>
+<body>
+<div th:replace="fragments/layout :: layout(~{::section})">
+    <section>
+        <h1>My Profile</h1>
+
+        <!-- Minimal styles to ensure tokens wrap nicely and table fits the viewport -->
+        <style>
+            .token-cell {
+                width: 40vw;
+            }
+
+            .token-box {
+                width: 100%;
+                box-sizing: border-box;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                white-space: pre-wrap; /* visual wrap without changing value */
+                word-break: break-word; /* fallback */
+                overflow-wrap: anywhere; /* modern wrapping */
+                resize: vertical; /* allow user to expand if desired */
+                max-height: 8rem; /* keep rows compact by default */
+            }
+
+            .copy-btn {
+                margin-left: 0.5rem;
+            }
+        </style>
+
+        <div th:if="${user == null}">
+            <p>Please <a th:href="@{/login}">log in</a> to view your profile.</p>
+        </div>
+
+        <div th:if="${user != null}">
+            <p><strong>Username:</strong> <span th:text="${user.username}">username</span></p>
+            <p><strong>Roles:</strong>
+                <span th:each="r, iter : ${user.roles}">
+                    <span th:text="${r.name}">ROLE_USER</span><span th:if="${!iter.last}">, </span>
+                </span>
+            </p>
+
+            <h2>Status</h2>
+            <ul>
+                <li>Account Non Expired: <b th:text="${!user.accountExpired} ? 'Yes' : 'No'"></b></li>
+                <li>Account Non Locked: <b th:text="${!user.accountLocked} ? 'Yes' : 'No'"></b></li>
+                <li>Credentials Non Expired: <b th:text="${!user.credentialsExpired} ? 'Yes' : 'No'"></b></li>
+            </ul>
+
+            <h2>API Tokens</h2>
+            <form th:action="@{/profile/token}" method="post" style="margin-bottom: 1rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <label for="ttlHours"><strong>TTL (hours)</strong>:</label>
+                <input id="ttlHours" name="ttlHours" type="number" min="1" max="24" value="24" style="width:5rem" />
+                <span style="color:#555;">Max 24 hours</span>
+                <button type="submit">Generate Token</button>
+            </form>
+
+            <div th:if="${#lists.isEmpty(tokens)}">
+                <em>No tokens yet.</em>
+            </div>
+            <table th:if="${!#lists.isEmpty(tokens)}" border="1" cellpadding="6" cellspacing="0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Issued</th>
+                    <th>Expires</th>
+                    <th>Valid</th>
+                    <th>Revoked</th>
+                    <th>Token</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="t : ${tokens}">
+                    <td th:text="${t.id}">1</td>
+                    <td th:text="${t.issuedAt}">now</td>
+                    <td th:text="${t.expiresAt}">later</td>
+                    <td th:with="now=${T(java.time.Instant).now()}"
+                        th:text="${!now.isBefore(t.issuedAt)} and ${!now.isAfter(t.expiresAt)}">true</td>
+                    <td th:text="${t.revoked}">false</td>
+                    <td class="token-cell">
+                        <!-- Read-only textarea: wraps visually, keeps value single-line (wrap="soft") -->
+                        <textarea class="token-box"
+                                  readonly
+                                  wrap="soft"
+                                  rows="3"
+                                  aria-label="API token"
+                                  th:text="${t.token}"></textarea>
+
+                        <!-- Copy button: copies the original single-line token (no newlines) -->
+                        <button type="button"
+                                class="copy-btn"
+                                th:attr="data-token=${t.token}"
+                                onclick="navigator.clipboard.writeText(this.dataset.token)">
+                            Copy
+                        </button>
+
+                        <!-- Existing Delete form -->
+                        <form th:action="@{'/profile/token/' + ${t.id} + '/delete'}" method="post"
+                              style="display:inline; margin-left:0.5rem;"
+                              onsubmit="return confirm('Delete this token?');">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+</body>
+</html>

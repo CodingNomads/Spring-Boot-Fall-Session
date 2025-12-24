@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Sign Up</title>
+</head>
+<body>
+<div th:replace="fragments/layout :: layout(~{::section})">
+    <section>
+        <h1>Create your account</h1>
+        <div th:if="${error}" style="color: darkred; font-weight: bold; margin-bottom: 0.5rem;" th:text="${error}">Error
+            message
+        </div>
+
+        <form th:action="@{/signup}" method="post">
+            <div>
+                <label>Username
+                    <input type="text" name="username" required/>
+                </label>
+            </div>
+            <div>
+                <label>Password
+                    <input type="password" name="password" required/>
+                </label>
+            </div>
+            <div>
+                <label>Confirm Password
+                    <input type="password" name="confirmPassword" required/>
+                </label>
+            </div>
+            <div>
+                <button type="submit">Sign up</button>
+            </div>
+        </form>
+
+        <p>
+            Already have an account?
+            <a th:href="@{/login}">Log in</a>
+        </p>
+    </section>
+</div>
+</body>
+</html>

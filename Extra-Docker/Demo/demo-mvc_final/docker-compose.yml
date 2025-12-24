@@ -1,0 +1,395 @@
+services:
+
+  app:
+    build: .
+    #    image: nikitabaranov/demo-mvc_final-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/codingnomads
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=secret_password
+    depends_on:
+      db:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+      kibana-setup:
+        condition: service_completed_successfully
+      admin:
+        condition: service_started
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=codingnomads
+      - MYSQL_ROOT_PASSWORD=secret_password
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  admin:
+    image: codecentric/spring-boot-admin:3.4.1
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.1
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:5601/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kibana-setup:
+    image: curlimages/curl:latest
+    depends_on:
+      kibana:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo '[INFO] Starting kibana-setup...';
+        
+        echo '[INFO] Waiting for Kibana to be ready...';
+        until curl -s http://kibana:5601/api/status | grep -q '\"level\":\"available\"'; do
+          echo '[DEBUG] Kibana is not ready yet. Retrying in 5 seconds...';
+          sleep 5;
+        done;
+        echo '[INFO] Kibana is ready!';
+
+        echo '[INFO] Waiting for Filebeat indices to be created in Elasticsearch...';
+        until curl -s http://elasticsearch:9200/_cat/indices/filebeat-* | grep -q 'filebeat-'; do
+          echo '[DEBUG] No filebeat-* indices found yet. Retrying in 5 seconds...';
+          sleep 5;
+        done;
+        echo '[INFO] Filebeat indices found!';
+        
+        echo '[INFO] Waiting for Metricbeat indices to be created in Elasticsearch...';
+        until curl -s http://elasticsearch:9200/_cat/indices/metricbeat-* | grep -q 'metricbeat-'; do
+          echo '[DEBUG] No metricbeat-* indices found yet. Retrying in 5 seconds...';
+          sleep 5;
+        done;
+        echo '[INFO] Metricbeat indices found!';
+
+        echo '[INFO] Attempting to create Filebeat Data View...';
+        PAYLOAD='{"data_view": {"title": "filebeat-*", "name": "Filebeat Logs", "timeFieldName": "@timestamp"}}'
+        RESPONSE=$$(curl -s -X POST 'http://kibana:5601/api/data_views/data_view' \
+          -H 'kbn-xsrf: true' \
+          -H 'Content-Type: application/json' \
+          -d "$$PAYLOAD");
+        
+        DATA_VIEW_ID=$$(echo "$$RESPONSE" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4);
+        
+        if [ -z "$$DATA_VIEW_ID" ]; then
+           echo "[WARN] Data View creation did not return an ID. It might already exist. Fetching all Data Views...";
+           RESPONSE=$$(curl -s -X GET 'http://kibana:5601/api/data_views' -H 'kbn-xsrf: true');
+           
+           echo "[INFO] Searching for existing filebeat-* Data View ID...";
+           DATA_VIEW_ID=$$(echo "$$RESPONSE" | sed 's/{"id":/\n{"id":/g' | grep '"title":"filebeat-\*"' | grep -o '"id":"[^"]*"' | head -n1 | cut -d'"' -f4);
+        fi
+        
+        if [ -n "$$DATA_VIEW_ID" ] && [ $${#DATA_VIEW_ID} -lt 100 ]; then
+          echo "[INFO] Using Data View ID: $$DATA_VIEW_ID";
+
+          # Set the default index and default columns for the space
+          echo "[INFO] Setting Filebeat Data View as default and configuring default columns...";
+          curl -s -X POST "http://kibana:5601/api/kibana/settings" \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d "{\"changes\":{\"defaultIndex\":\"$$DATA_VIEW_ID\",\"defaultColumns\":[\"service.name\",\"http.route\",\"user.name\",\"user.roles\",\"message\"]}}";
+
+          echo "[INFO] Creating or updating Saved Search 'Default App Search'...";
+          
+          # Explicitly define columns in both attributes and searchSourceJSON
+          SEARCH_PAYLOAD='{
+            "attributes": {
+              "title": "Default App Search",
+              "description": "Preconfigured search with user and service info",
+              "hits": 0,
+              "columns": ["service.name", "http.route", "user.name", "user.roles", "message"],
+              "sort": [["@timestamp", "desc"]],
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\",\"columns\":[\"service.name\",\"http.route\",\"user.name\",\"user.roles\",\"message\"]}"
+              }
+            },
+            "references": [
+              {
+                "name": "kibanaSavedObjectMeta.searchSource.index",
+                "type": "index-pattern",
+                "id": "'$$DATA_VIEW_ID'"
+              }
+            ]
+          }'
+          
+          # Remove newlines and extra spaces from payload to ensure it is valid for curl
+          CLEAN_PAYLOAD=$$(echo "$$SEARCH_PAYLOAD" | tr -d '\n' | sed 's/  */ /g')
+          
+          echo "[DEBUG] Saved Search Payload: $$CLEAN_PAYLOAD"
+          
+          FINAL_RESPONSE=$$(curl -s -X POST "http://kibana:5601/api/saved_objects/search/default-app-search?overwrite=true" \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d "$$CLEAN_PAYLOAD");
+            
+          echo "[DEBUG] Final Response: $$FINAL_RESPONSE";
+          
+          if echo "$$FINAL_RESPONSE" | grep -q '"id":"default-app-search"'; then
+            echo "[INFO] Successfully created/updated Saved Search.";
+          else
+            echo "[ERROR] Failed to create/update Saved Search. See response above.";
+            exit 1
+          fi
+
+          echo "[INFO] Attempting to create Metricbeat Data View...";
+          METRIC_PAYLOAD='{"data_view": {"title": "metricbeat-*", "name": "Metricbeat Data", "timeFieldName": "@timestamp"}}'
+          METRIC_RESPONSE=$$(curl -s -X POST 'http://kibana:5601/api/data_views/data_view' \
+            -H 'kbn-xsrf: true' \
+            -H 'Content-Type: application/json' \
+            -d "$$METRIC_PAYLOAD");
+          
+          METRIC_DATA_VIEW_ID=$$(echo "$$METRIC_RESPONSE" | grep -o '"id":"[^"]*' | head -n1 | cut -d'"' -f4);
+          
+          if [ -z "$$METRIC_DATA_VIEW_ID" ]; then
+             echo "[WARN] Metricbeat Data View creation did not return an ID. Fetching all Data Views...";
+             RESPONSE=$$(curl -s -X GET 'http://kibana:5601/api/data_views' -H 'kbn-xsrf: true');
+             # Try to find the one with title "metricbeat-*" AND name "Metricbeat Data" first
+             METRIC_DATA_VIEW_ID=$$(echo "$$RESPONSE" | sed 's/{"id":/\n{"id":/g' | grep '"title":"metricbeat-\*"' | grep '"name":"Metricbeat Data"' | grep -o '"id":"[^"]*"' | head -n1 | cut -d'"' -f4);
+             if [ -z "$$METRIC_DATA_VIEW_ID" ]; then
+                METRIC_DATA_VIEW_ID=$$(echo "$$RESPONSE" | sed 's/{"id":/\n{"id":/g' | grep '"title":"metricbeat-\*"' | grep -o '"id":"[^"]*"' | head -n1 | cut -d'"' -f4);
+             fi
+          fi
+          
+          if [ -n "$$METRIC_DATA_VIEW_ID" ]; then
+            echo "[INFO] Using Metricbeat Data View ID: $$METRIC_DATA_VIEW_ID";
+          else
+            echo "[ERROR] Could not find Metricbeat Data View ID.";
+            exit 1
+          fi
+
+          echo "[INFO] Creating Spring Boot Metrics Dashboard...";
+          # Define visualizations and dashboard for Spring Boot metrics
+          
+          DASHBOARD_PAYLOAD='{
+            "attributes": {
+              "title": "Spring Boot Metrics",
+              "description": "Custom metrics dashboard for Spring Boot Actuator",
+              "hits": 0,
+              "panelsJSON": "[{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":0,\"w\":12,\"h\":10,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_0\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":0,\"w\":12,\"h\":10,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":10,\"w\":12,\"h\":10,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{},\"panelRefName\":\"panel_2\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":10,\"w\":12,\"h\":10,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{},\"panelRefName\":\"panel_3\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":20,\"w\":12,\"h\":10,\"i\":\"5\"},\"panelIndex\":\"5\",\"embeddableConfig\":{},\"panelRefName\":\"panel_4\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":20,\"w\":12,\"h\":10,\"i\":\"6\"},\"panelIndex\":\"6\",\"embeddableConfig\":{},\"panelRefName\":\"panel_5\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":0,\"y\":30,\"w\":12,\"h\":10,\"i\":\"7\"},\"panelIndex\":\"7\",\"embeddableConfig\":{},\"panelRefName\":\"panel_6\"},{\"version\":\"8.11.1\",\"gridData\":{\"x\":12,\"y\":30,\"w\":12,\"h\":10,\"i\":\"8\"},\"panelIndex\":\"8\",\"embeddableConfig\":{},\"panelRefName\":\"panel_7\"}]",
+              "optionsJSON": "{\"useMargins\":true,\"hidePanelTitles\":false}",
+              "timeRestore": false,
+              "kibanaSavedObjectMeta": { "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}" }
+            },
+            "references": [
+              { "name": "panel_0", "type": "visualization", "id": "springboot-memory-usage" },
+              { "name": "panel_1", "type": "visualization", "id": "springboot-cpu-usage" },
+              { "name": "panel_2", "type": "visualization", "id": "springboot-http-requests" },
+              { "name": "panel_3", "type": "visualization", "id": "springboot-uptime" },
+              { "name": "panel_4", "type": "visualization", "id": "springboot-latency" },
+              { "name": "panel_5", "type": "visualization", "id": "springboot-threads" },
+              { "name": "panel_6", "type": "visualization", "id": "springboot-log-events" },
+              { "name": "panel_7", "type": "visualization", "id": "springboot-jdbc-connections" }
+            ]
+          }'
+          
+          # Visualization for JVM Memory
+          MEMORY_VIS='{
+            "attributes": {
+              "title": "JVM Memory Usage",
+              "visState": "{\"title\":\"JVM Memory Usage\",\"type\":\"area\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"area\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Bytes\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.jvm_memory_used_bytes\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for CPU Usage
+          CPU_VIS='{
+            "attributes": {
+              "title": "CPU Usage",
+              "visState": "{\"title\":\"CPU Usage\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Usage %\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.system_cpu_usage\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for HTTP Requests
+          HTTP_VIS='{
+            "attributes": {
+              "title": "HTTP Requests",
+              "visState": "{\"title\":\"HTTP Requests\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"params\":{\"field\":\"prometheus.metrics.http_server_requests_seconds_count\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"},{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"params\":{\"field\":\"prometheus.labels.uri\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"},\"schema\":\"group\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for Uptime
+          UPTIME_VIS='{
+            "attributes": {
+              "title": "Application Uptime",
+              "visState": "{\"title\":\"Application Uptime\",\"type\":\"metric\",\"params\":{\"addLegend\":false,\"addTooltip\":true,\"type\":\"metric\",\"metric\":{\"percentageMode\":false,\"useRanges\":false,\"colorSchema\":\"Green to Red\",\"metricColorMode\":\"None\",\"colorsRange\":[{\"from\":0,\"to\":10000}],\"labels\":{\"show\":true},\"invertColors\":false,\"style\":{\"fontSize\":60,\"bgColor\":false,\"labelColor\":false,\"subText\":\"\"}}},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.process_uptime_seconds\"},\"schema\":\"metric\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for HTTP Latency (Max)
+          LATENCY_VIS='{
+            "attributes": {
+              "title": "HTTP Request Latency (Max)",
+              "visState": "{\"title\":\"HTTP Request Latency (Max)\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Seconds\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.http_server_requests_seconds_max\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"},{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"params\":{\"field\":\"prometheus.labels.uri\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"},\"schema\":\"group\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for JVM Threads
+          THREADS_VIS='{
+            "attributes": {
+              "title": "JVM Live Threads",
+              "visState": "{\"title\":\"JVM Live Threads\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.jvm_threads_live_threads\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for Log Events
+          LOGS_VIS='{
+            "attributes": {
+              "title": "Log Events by Level",
+              "visState": "{\"title\":\"Log Events by Level\",\"type\":\"histogram\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"histogram\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"sum\",\"params\":{\"field\":\"prometheus.metrics.logback_events_total\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"},{\"id\":\"3\",\"enabled\":true,\"type\":\"terms\",\"params\":{\"field\":\"prometheus.labels.level\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"},\"schema\":\"group\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Visualization for JDBC Connections
+          JDBC_VIS='{
+            "attributes": {
+              "title": "JDBC Active Connections",
+              "visState": "{\"title\":\"JDBC Active Connections\",\"type\":\"line\",\"params\":{\"addLegend\":true,\"addTooltip\":true,\"type\":\"line\",\"grid\":{\"categoryLines\":false},\"categoryAxes\":[{\"id\":\"CategoryAxis-1\",\"type\":\"category\",\"position\":\"bottom\",\"show\":true,\"style\":{},\"scale\":{\"type\":\"linear\"},\"labels\":{\"show\":true,\"truncate\":100},\"title\":{}}],\"valueAxes\":[{\"id\":\"ValueAxis-1\",\"name\":\"LeftAxis-1\",\"type\":\"metric\",\"position\":\"left\",\"show\":true,\"style\":{},\"scale\":{\"mode\":\"normal\",\"type\":\"linear\"},\"labels\":{\"show\":true,\"rotate\":0,\"filter\":false,\"truncate\":100},\"title\":{\"text\":\"Count\"}}]},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"max\",\"params\":{\"field\":\"prometheus.metrics.jdbc_connections_active\"},\"schema\":\"metric\"},{\"id\":\"2\",\"enabled\":true,\"type\":\"date_histogram\",\"params\":{\"field\":\"@timestamp\",\"calendar_interval\":\"auto\",\"min_doc_count\":1},\"schema\":\"segment\"}]}",
+              "uiStateJSON": "{}",
+              "description": "",
+              "kibanaSavedObjectMeta": {
+                "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[],\"indexRefName\":\"kibanaSavedObjectMeta.searchSource.index\"}"
+              }
+            },
+            "references": [ { "name": "kibanaSavedObjectMeta.searchSource.index", "type": "index-pattern", "id": "'$$METRIC_DATA_VIEW_ID'" } ]
+          }'
+
+          # Create Visualizations
+          for VIS_NAME in MEMORY_VIS CPU_VIS HTTP_VIS UPTIME_VIS LATENCY_VIS THREADS_VIS LOGS_VIS JDBC_VIS; do
+            case $$VIS_NAME in
+              MEMORY_VIS) ID="springboot-memory-usage"; PAYLOAD=$$MEMORY_VIS ;;
+              CPU_VIS) ID="springboot-cpu-usage"; PAYLOAD=$$CPU_VIS ;;
+              HTTP_VIS) ID="springboot-http-requests"; PAYLOAD=$$HTTP_VIS ;;
+              UPTIME_VIS) ID="springboot-uptime"; PAYLOAD=$$UPTIME_VIS ;;
+              LATENCY_VIS) ID="springboot-latency"; PAYLOAD=$$LATENCY_VIS ;;
+              THREADS_VIS) ID="springboot-threads"; PAYLOAD=$$THREADS_VIS ;;
+              LOGS_VIS) ID="springboot-log-events"; PAYLOAD=$$LOGS_VIS ;;
+              JDBC_VIS) ID="springboot-jdbc-connections"; PAYLOAD=$$JDBC_VIS ;;
+            esac
+            
+            CLEAN_VIS_PAYLOAD=$(echo "$$PAYLOAD" | tr -d '\n' | sed 's/  */ /g')
+            curl -s -X POST "http://kibana:5601/api/saved_objects/visualization/$$ID?overwrite=true" \
+              -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+              -d "$$CLEAN_VIS_PAYLOAD" > /dev/null
+          done
+            
+          # Create Dashboard
+          CLEAN_DASHBOARD_PAYLOAD=$$(echo "$$DASHBOARD_PAYLOAD" | tr -d '\n' | sed 's/  */ /g')
+          curl -s -X POST "http://kibana:5601/api/saved_objects/dashboard/springboot-metrics?overwrite=true" \
+            -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+            -d "$$CLEAN_DASHBOARD_PAYLOAD" > /dev/null
+            
+          echo "[INFO] Spring Boot Metrics Dashboard created successfully."
+        else
+          echo "[ERROR] Failed to retrieve Data View ID. Cannot proceed with Saved Search creation.";
+          exit 1
+        fi
+        echo '[INFO] kibana-setup completed successfully.'
+        
+  metricbeat-setup:
+    image: docker.elastic.co/beats/metricbeat:8.11.1
+    user: root
+    depends_on:
+      kibana:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+    volumes:
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+    command: setup -e
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.1
+    user: root
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    depends_on:
+      - elasticsearch
+
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:8.11.1
+    user: root
+    volumes:
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - elasticsearch
+      - app

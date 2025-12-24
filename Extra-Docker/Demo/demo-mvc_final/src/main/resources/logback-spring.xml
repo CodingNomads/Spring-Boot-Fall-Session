@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="jsonConsole" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp><timeZone>UTC</timeZone></timestamp>
+                <pattern>
+                    <pattern>
+                        {
+                        "severity": "%level",
+                        "service": {
+                            "name": "${spring.application.name:-demo-web}"
+                        },
+                        "thread": "%thread",
+                        "class": "%logger{40}",
+                        "user": {
+                            "name": "%X{username:-}",
+                            "roles": "%X{roles:-}"
+                        },
+                        "http": {
+                            "route": "%X{route:-}"
+                        },
+                        "message": "%message"
+                        }
+                    </pattern>
+                </pattern>
+                <arguments/><stackTrace/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="jsonConsole" />
+    </root>
+
+    <!-- Unified Hibernate SQL logging -->
+    <logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
+        <appender-ref ref="jsonConsole" />
+    </logger>
+</configuration>
