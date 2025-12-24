@@ -60,7 +60,28 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 #### Option B: Spring Boot Built-in Support (Cloud Native Buildpacks)
 
 Spring Boot includes support for creating optimized Docker images without needing a `Dockerfile`. It uses **Cloud Native
-Buildpacks** to create a production-ready image.
+Buildpacks** (specifically Paketo Buildpacks) to create a production-ready image.
+
+**Configure the Builder:**
+
+To ensure a stable build, we configure the `bootBuildImage` task in `build.gradle`. A common requirement is to specify
+the Java version for the buildpack:
+
+```gradle
+tasks.named('bootBuildImage') {
+    environment["BP_JVM_VERSION"] = "17"
+}
+```
+
+> **Note:** If you encounter errors during the export phase (e.g., `failed to fetch base layers` or
+`NotFound: content digest`), it is usually due to the **"containerd image store"** feature in Docker Desktop.
+>
+> **To fix this:**
+> 1. Open Docker Desktop Settings.
+> 2. Go to **General** or **Developer** (depending on version).
+> 3. Uncheck **"Use containerd for pulling and storing images"**.
+> 4. Apply & Restart Docker.
+> 5. Clear the build cache: `docker volume rm $(docker volume ls -qf name=pack-cache-)` (or run `./gradlew clean`).
 
 **Build the Image:**
 
