@@ -26,6 +26,8 @@ services:
       - MYSQL_ROOT_PASSWORD=secret_password
     ports:
       - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
     healthcheck:
       test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
       timeout: 20s
@@ -393,3 +395,6 @@ services:
     depends_on:
       - elasticsearch
       - app
+
+volumes:
+  mysql-data: # virtual volume for MySQL data persistence

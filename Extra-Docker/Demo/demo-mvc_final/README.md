@@ -74,6 +74,18 @@ This project uses Docker Compose to manage the database (MySQL) and the observab
 *multi-stage Dockerfile** for the application itself, which builds the project using Gradle and packages it into a slim
 JRE image.
 
+#### 💾 Data Persistence
+
+The MySQL database uses a Docker volume (`mysql-data`) to persist data. This means your data will remain even if you
+stop or remove the containers.
+
+- **To wipe the database clean**: If you need to reset the database and delete all stored data, use:
+  ```bash
+  docker-compose down --volumes
+  ```
+  The `--volumes` flag tells Docker Compose to remove the named volumes declared in the `volumes` section of the
+  `docker-compose.yml` file.
+
 #### 🛠️ Common Commands
 
 | Action                    | Command                        |

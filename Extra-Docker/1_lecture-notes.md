@@ -116,9 +116,32 @@ Compose** allows you to define and run multi-container applications with a singl
 The `demo-mvc_final` project uses a comprehensive Docker Compose setup including:
 
 - **Application**: The Spring Boot app itself.
-- **Database**: MySQL 8.0 with health checks.
+- **Database**: MySQL 8.0 with health checks and **persistent storage** via volumes.
 - **Monitoring**: Spring Boot Admin for real-time application status.
 - **Logging & Metrics (ELK Stack)**: Elasticsearch, Kibana, Filebeat, and Metricbeat.
+
+#### Data Persistence in Compose
+
+By default, data in a container is ephemeral—it's lost when the container is deleted. To persist database data, we use **Volumes**.
+
+In our `docker-compose.yml`:
+```yaml
+services:
+  db:
+    image: mysql:8.0
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
+```
+
+- `mysql-data` is a **named volume** managed by Docker.
+- It maps to `/var/lib/mysql` inside the container, where MySQL stores its data.
+- **Wiping Data**: To completely reset the database and delete the volume, run:
+  ```bash
+  docker-compose down -v
+  ```
 
 #### Running the Stack
 
