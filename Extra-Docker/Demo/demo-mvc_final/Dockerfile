@@ -1,12 +1,11 @@
-# Step 1: Use an official JDK runtime as a parent image
-FROM eclipse-temurin:17
-
-# Step 2: Set the working directory inside the container
+# Stage 1: Build the application
+FROM gradle:8.5-jdk17 AS build
 WORKDIR /app
+COPY . .
+RUN ./gradlew bootJar --no-daemon
 
-# Step 3: Copy the executable JAR file from the host to the container
-# Note: Ensure you run './gradlew bootJar' first to generate this file
-COPY build/libs/demo-mvc-0.0.1-SNAPSHOT.jar app.jar
-
-# Step 4: Run the JAR file
+# Stage 2: Run the application
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/build/libs/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
