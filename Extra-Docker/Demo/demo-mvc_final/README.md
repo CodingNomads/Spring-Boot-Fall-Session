@@ -70,19 +70,22 @@ The project follows a standard layered architecture:
 
 ### 🐳 Docker Setup
 
-This project uses Docker Compose to manage the database (MySQL) and the observability stack (ELK).
+This project uses Docker Compose to manage the database (MySQL) and the observability stack (ELK). It also includes a *
+*multi-stage Dockerfile** for the application itself, which builds the project using Gradle and packages it into a slim
+JRE image.
 
 #### 🛠️ Common Commands
 
-| Action                    | Command                      |
-|:--------------------------|:-----------------------------|
-| **Start everything**      | `docker-compose up -d`       |
-| **Stop everything**       | `docker-compose down`        |
-| **Stop & remove volumes** | `docker-compose down -v`     |
-| **View all logs**         | `docker-compose logs -f`     |
-| **View app logs**         | `docker-compose logs -f app` |
-| **Rebuild app**           | `docker-compose build app`   |
-| **Restart app**           | `docker-compose restart app` |
+| Action                    | Command                        |
+|:--------------------------|:-------------------------------|
+| **Start everything**      | `docker-compose up -d`         |
+| **Build & Start**         | `docker-compose up -d --build` |
+| **Stop everything**       | `docker-compose down`          |
+| **Stop & remove volumes** | `docker-compose down -v`       |
+| **View all logs**         | `docker-compose logs -f`       |
+| **View app logs**         | `docker-compose logs -f app`   |
+| **Rebuild app**           | `docker-compose build app`     |
+| **Restart app**           | `docker-compose restart app`   |
 
 ### 🧹 Cleanup (Pruning)
 

@@ -35,27 +35,38 @@ Using the project `demo-mvc_final` as an example.
 
 #### Option A: Custom `Dockerfile` (Manual Control)
 
-Create a file named `Dockerfile` in the root of your project:
+Create a file named `Dockerfile` in the root of your project. We use a **Multi-stage build** to keep our final image
+lean and secure.
+
+**Why Multi-stage?**
+
+1. **Smaller Image Size**: The final image only contains the JRE and the JAR file, not the entire Gradle build tool or
+   source code.
+2. **Security**: The build tools and source code are not present in the production image, reducing the attack surface.
+3. **Efficiency**: It separates the build environment from the runtime environment.
 
 ```dockerfile
-# Step 1: Use an official JDK runtime as a parent image
-FROM eclipse-temurin:17-jdk-alpine
-
-# Step 2: Set the working directory inside the container
+# Stage 1: Build the application
+# We use a full Gradle image with JDK to compile the code
+FROM gradle:8.5-jdk17 AS build
 WORKDIR /app
+COPY . .
+RUN ./gradlew bootJar --no-daemon
 
-# Step 3: Copy the executable JAR file from the host to the container
-# Note: Ensure you run './gradlew bootJar' first to generate this file
-COPY build/libs/demo-web-0.0.1-SNAPSHOT.jar app.jar
-
-# Step 4: Run the JAR file
+# Stage 2: Run the application
+# We switch to a slim JRE-only image for the final runtime
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+# Only copy the built JAR from the 'build' stage
+COPY --from=build /app/build/libs/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
 **Build and Run Locally:**
 
-1. **Build the JAR**: `./gradlew bootJar`
-2. **Build the Image**: `docker build -t demo-mvc-app .`
+1. **Build the Image**: `docker build -t demo-mvc-app .`
+   *(Notice we don't need to run `./gradlew bootJar` manually on our host anymore! Docker handles it inside the first
+   stage.)*
 
 #### Option B: Spring Boot Built-in Support (Cloud Native Buildpacks)
 
@@ -187,8 +198,9 @@ your environment clean:
 
 ### 7) Best Practices
 
-- **Multi-stage builds**: If using a `Dockerfile`, use a build stage to compile the code and a separate runtime stage to
-  keep the final image size small.
+- **Multi-stage builds**: As shown in our custom `Dockerfile`, use a build stage to compile the code and a separate
+  runtime stage to
+  keep the final image size small and improve security.
 - **Security**: Don't run containers as `root`.
 - **Configuration**: Use environment variables to pass database credentials and secrets to the container at runtime.
 - **Health Checks**: Always define health checks so the orchestrator knows when your app is ready to receive traffic.
